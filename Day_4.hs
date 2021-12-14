@@ -42,3 +42,17 @@ calculateScore (wb, n) = n * (sum . map fst . filter (not . snd) $ concat wb)
 
 firstPart :: IO Int
 firstPart = calculateScore <$> winnerAndNumber
+
+lastToWinAndNumber :: [Int] -> [[[(Int,Bool)]]] -> ([[(Int,Bool)]],Int)
+lastToWinAndNumber [] boards = (last boards,0)
+lastToWinAndNumber (n:ns) boards =
+  let markedBoards = map (map (map (markNumber n))) boards
+      stillPlaying = filter (not . isBingo) markedBoards
+      candidate    = last markedBoards
+  in case length stillPlaying of
+       0 -> (candidate, n)
+       1 -> if isBingo (head stillPlaying) then (head stillPlaying, n) else lastToWinAndNumber ns stillPlaying
+       _ -> lastToWinAndNumber ns stillPlaying
+
+secondPart :: IO Int
+secondPart = calculateScore <$> (lastToWinAndNumber <$> drawnNumbers <*> initBingo)
