@@ -18,7 +18,7 @@ mostCommon :: Count -> Int
 mostCommon (z,o) = if z > o then 0 else 1
 
 leastCommon :: Count -> Int
-leastCommon (z,o) = if z < o then 0 else 1
+leastCommon (z,o) = if z > o then 1 else 0
 
 gamma :: [Count] -> [Int]
 gamma = map mostCommon
@@ -37,3 +37,35 @@ firstPart = (*) <$> gammaRate <*> epsilonRate
   where
     gammaRate = binToDec . gamma . countsForAll <$> input
     epsilonRate = binToDec . epsilon . countsForAll <$> input
+
+oxygen :: [String] -> String
+oxygen input = oxygenHelper input 0
+  where
+    oxygenHelper input pos =
+      if length input == 1
+        then head input
+        else oxygenHelper (filter (\ str -> str !! pos == common) input) (pos+1)
+            where
+            count = foldl (\ count str -> countBit count (str !! pos)) (0,0) input
+            common = case mostCommon count of
+                        0 -> '0'
+                        _ -> '1'
+
+c02 :: [String] -> String
+c02 input = c02Helper input 0
+  where
+    c02Helper input pos =
+      if length input == 1
+        then head input
+        else c02Helper (filter (\ str -> str !! pos == uncommon) input) (pos+1)
+            where
+            count = foldl (\ count str -> countBit count (str !! pos)) (0,0) input
+            uncommon = case leastCommon count of
+                        1 -> '1'
+                        _ -> '0'
+
+secondPart :: IO Int
+secondPart = (*) <$> oxygenRating <*> c02Rating
+  where
+    oxygenRating = binToDec . map ((read :: String -> Int) . (: [])) . oxygen <$> input
+    c02Rating = binToDec . map ((read :: String -> Int) . (: [])) . c02 <$> input
