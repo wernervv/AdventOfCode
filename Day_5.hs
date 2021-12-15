@@ -43,14 +43,18 @@ isHorizontal = (\ [a,b] -> a == b) . lineYCoords
 isVertical :: Line -> Bool
 isVertical = (\ [a,b] -> a == b) . lineXCoords
 
+isDiagonal :: Line -> Bool
+isDiagonal ((x1,y1), (x2,y2)) = abs(x2 - x1) == abs(y2 - y1)
+
 generateLine :: Line -> [Point]
 generateLine line@((x1,y1),(x2,y2))
     | isHorizontal line = zip (numbersInRange x1 x2) (repeat y1)
     | isVertical line = zip (repeat x1) (numbersInRange y1 y2)
+    | isDiagonal line = zip (numbersInRange x1 x2) (numbersInRange y1 y2)
     | otherwise = []
 
 numbersInRange :: Int -> Int -> [Int]
-numbersInRange x y = if x > y then [y..x] else [x..y]
+numbersInRange x y = if x > y then reverse [y..x] else [x..y]
 
 updateOne :: Point -> [[Int]] -> [[Int]]
 updateOne (x,y) = helper y x []
@@ -68,7 +72,7 @@ updateOne (x,y) = helper y x []
                 else y : updateX (x-1) ys
 
 drawLine :: Line -> [[Int]] -> [[Int]]
-drawLine line = if isVertical line || isHorizontal line
+drawLine line = if isVertical line || isHorizontal line || isDiagonal line
     then flip (foldl (flip ($))) (map updateOne $ generateLine line)
     else id
 
@@ -85,8 +89,8 @@ overlappingCount (p:ps) = thisOverlaps + overlappingCount modified
     thisOverlaps = if p `elem` ps then 1 else 0
     modified = filter (/= p) ps
 
-firstPart :: IO Int
-firstPart = allOverlaps <$> (foldl (flip ($)) <$> initField <*> (map drawLine <$> lineInput))
+firstAndSecondPart :: IO Int
+firstAndSecondPart = allOverlaps <$> (foldl (flip ($)) <$> initField <*> (map drawLine <$> lineInput))
 
 firstPart2 :: IO Int
 firstPart2 = overlappingCount . allPoints <$> lineInput
