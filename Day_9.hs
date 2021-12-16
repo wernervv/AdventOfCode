@@ -1,5 +1,7 @@
-type Coord = (Int, Int)
+import Data.List(group, sort, sortBy, union)
+
 type Field = [[Int]]
+type Coord = (Int, Int)
 
 input :: IO Field
 input = map (map ((read :: String -> Int) . (: []))) . lines <$> readFile "day_9_input.txt"
@@ -28,3 +30,33 @@ firstPart :: IO Int
 firstPart =
   do f <- input
      return $ sum $ map ((+1) . (`giveHeight` f)) $ allLowPoints f
+
+increaseBasin :: [Coord] -> Field -> [Coord]
+increaseBasin basin f =
+  let new = removeDuplicates $ concatMap (filter (\ c -> isPartOfBasin c f && notElem c basin) . (`neighbors` boundaries f)) basin
+  in if null new
+       then basin
+       else increaseBasin (basin ++ new) f
+
+isPartOfBasin :: Coord -> Field -> Bool
+isPartOfBasin c f = giveHeight c f /= 9
+
+removeDuplicates :: Ord a => [a] -> [a]
+removeDuplicates = map head . group . sort
+
+allBasins :: Field -> [[Coord]]
+allBasins f = map ((`increaseBasin` f) . (: [])) $ allLowPoints f
+
+basinSize :: [Coord] -> Int
+basinSize = length
+
+largestThree :: [Int] -> [Int]
+largestThree = take 3 . sortBy (flip compare)
+
+secondPart :: IO Int
+secondPart =
+  do f <- input
+     return $ product . largestThree . map basinSize $ allBasins f
+
+testInput :: Field
+testInput = map (map ((read :: String -> Int) . (: []))) ["2199943210", "3987894921", "9856789892", "8767896789", "9899965678"]
