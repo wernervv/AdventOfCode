@@ -1,3 +1,5 @@
+import Data.List(sort)
+
 input :: IO [String]
 input = lines <$> readFile "day_10_input.txt"
 
@@ -58,3 +60,44 @@ syntaxErrorScore c =
 
 firstPart :: IO Int
 firstPart = sum . map (syntaxErrorScore . firstIllegal . removeValidChunks) . allCorrupted <$> input
+
+allIncomplete :: [String] -> [String]
+allIncomplete = filter (not . isCorrupted)
+
+completesBy :: String -> String
+completesBy = helper . reverse . removeValidChunks
+  where
+    helper [] = []
+    helper (x:xs) = counterPart x : helper xs
+
+counterPart :: Char -> Char
+counterPart c =
+  case c of
+    '(' -> ')'
+    '{' -> '}'
+    '[' -> ']'
+    '<' -> '>'
+    _   -> '1'
+
+completeCharScore :: Char -> Int
+completeCharScore c =
+  case c of
+    ')' -> 1
+    ']' -> 2
+    '}' -> 3
+    '>' -> 4
+    _   -> 0
+
+countCompleteScore :: String -> Int
+countCompleteScore = helper 0
+  where
+    helper acc [] = acc
+    helper acc (x:xs) = helper newAcc xs
+      where
+        newAcc = 5*acc + completeCharScore x
+
+middleVal :: [a] -> a
+middleVal l = l !! ((length l - 1) `div` 2)
+
+secondPart :: IO Int
+secondPart = middleVal . sort . map (countCompleteScore . completesBy) . allIncomplete <$> input
