@@ -97,5 +97,17 @@ countFlashesForGivenSteps = helper 0
 firstPart :: IO Int
 firstPart = countFlashesForGivenSteps 100 <$> initializedInput
 
+firstSimultaneousFlash :: Field -> Int
+firstSimultaneousFlash = helper 1
+  where
+    helper ctr f = let intermediateField = flash . increaseAll $ f
+                       flashCount = length . filter snd $ concat intermediateField
+                       (bx,by) = boundaries f
+                       totalSize = (bx+1) * (by+1)
+                    in if flashCount == totalSize then ctr else helper (ctr+1) (resetFlashed intermediateField)
+
+secondPart :: IO Int
+secondPart = firstSimultaneousFlash <$> initializedInput
+
 testInput :: Field
 testInput = initialize . map (map ((read :: String -> Int) . (: []))) . splitOn " " $ "5483143223 2745854711 5264556173 6141336146 6357385478 4167524645 2176841721 6882881134 4846848554 5283751526"
