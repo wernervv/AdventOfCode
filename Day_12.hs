@@ -1,6 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 
 import Data.Char(isAsciiLower,isAsciiUpper)
+import Data.List(group,sort)
 import Data.List.Split(splitOn)
 
 type Connection = (String,String)
@@ -67,11 +68,44 @@ allPathsDirty lc =
                where
                  moveToNextCave c = helper (c : path) c lc (arrive c cs)
 
+removeDuplicates :: Ord a => [a] -> [a]
+removeDuplicates = map head . group . sort
+
 prunePaths :: [Path] -> [Path]
-prunePaths = map reverse . filter (\ path -> head path == "end")
+prunePaths = map reverse . removeDuplicates . filter (\ path -> head path == "end")
 
 firstPart :: IO Int
 firstPart = length . prunePaths . allPathsDirty <$> input
+
+updateVisitPossibility :: Bool -> CaveState -> CaveState
+updateVisitPossibility b = map (\ orig@(cave,_) -> if cave == "secondVisitUsed" && b then (cave, True) else orig)
+
+arrive2 :: Bool -> Cave -> CaveState -> CaveState
+arrive2 visitTwice c =
+  let getsVisited = not visitTwice
+  in updateVisitPossibility visitTwice . map (\ orig@(cave,_) -> if cave == c then (cave,getsVisited && isSmallCave cave) else orig)
+
+secondVisitIsUsable :: CaveState -> Bool
+secondVisitIsUsable = not . snd . head . filter ((== "secondVisitUsed" ) . fst)
+
+allPathsVisitPossibility :: [Connection] -> [Path]
+allPathsVisitPossibility lc =
+  let cs = (("secondVisitUsed",False):) . initCaveState . allCaves $ lc
+  in helper ["start"] "start" lc cs
+    where
+      helper path currentCave lc cs =
+        let nextCaves = possibleTransitions currentCave lc cs
+        in if null nextCaves
+             then [path]
+             else concatMap conditionalMove nextCaves
+                    where
+                      conditionalMove c =
+                        let canMakeSecondVisit = secondVisitIsUsable cs
+                            conditionalPaths = if canMakeSecondVisit then helper (c : path) c lc (arrive2 True c cs) else []
+                        in helper (c : path) c lc (arrive2 False c cs) ++ conditionalPaths
+
+secondPart :: IO Int
+secondPart = length . prunePaths . allPathsVisitPossibility <$> input
 
 testInput :: [Connection]
 testInput = map readConnection $ splitOn " " "start-A start-b A-c A-b b-d A-end b-end"
