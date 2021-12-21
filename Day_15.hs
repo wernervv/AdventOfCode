@@ -160,5 +160,34 @@ safestPathRisk c = helper ([start],c)
 firstPart :: IO Int
 firstPart = safestPathRisk . initCavern <$> input
 
+repeatTile :: [[Int]] -> [[Int]]
+repeatTile = map (map (\ n -> if n == 9 then 1 else n+1))
+
+scaleHorizontally :: Int -> [[Int]] -> [[[Int]]]
+scaleHorizontally n = take n . iterate repeatTile
+
+scaleVertically :: Int -> [[[Int]]] -> [[[[Int]]]]
+scaleVertically n = take n . iterate (map repeatTile)
+
+f :: [[[a]]] -> Int -> [a]
+f input n = concatMap (!! n) input
+
+readAsBigLines :: [[[a]]] -> [[a]]
+readAsBigLines input =
+  let underlyingY = length . head $ input
+  in map (f input) [0..(underlyingY-1)]
+
+readAsOne :: [[[[a]]]] -> [[a]]
+readAsOne = concatMap readAsBigLines
+
+scaleUp :: Int -> [[Int]] -> [[Int]]
+scaleUp factor = readAsOne . scaleVertically factor . scaleHorizontally factor
+
+initFullMap :: [[Int]] -> Cavern
+initFullMap input = map (map (,NullRisk,NullCoord)) $ scaleUp 5 input
+
+secondPart :: IO Int
+secondPart = safestPathRisk . initFullMap <$> input
+
 testInput :: [[Int]]
 testInput = map (map (\ c -> (read :: String -> Int) [c])) ["1163751742", "1381373672", "2136511328", "3694931569", "7463417111", "1319128137", "1359912421", "3125421639", "1293138521", "2311944581"]
