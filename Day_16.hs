@@ -7,11 +7,63 @@ type Packet = Bits
 type TypeID = Int
 type Version = Int
 
-data ParsedPacket = LV Int | Op [ParsedPacket] -- Literal Value | Operator
+data GeneralParsedPacket a = Sum a -- sum
+                           | Prod a -- product
+                           | Min a -- minimum
+                           | Max a -- maximum
+                           | LV a -- Literal Value
+                           | Gt a -- greater than
+                           | Lt a -- less than
+                           | Eq a -- equal to
+                           | Op [GeneralParsedPacket a] -- Operator
 
-instance Show ParsedPacket where
+type ParsedPacket = GeneralParsedPacket Int
+
+instance Show a => Show (GeneralParsedPacket a) where
+    show (Sum val) = "Sum " ++ show val
+    show (Prod val) = "Prod " ++ show val
+    show (Min val) = "Min " ++ show val
+    show (Max val) = "Max " ++ show val
     show (LV val) = "LV " ++ show val
+    show (Gt val) = "Gt " ++ show val
+    show (Lt val) = "Lt " ++ show val
+    show (Eq val) = "Eq " ++ show val
     show (Op ls) = "Op " ++ show ls
+
+instance Functor GeneralParsedPacket where
+     
+    fmap f (Sum val) = Sum $ f val
+    fmap f (Prod val) = Prod $ f val
+    fmap f (Min val) = Min $ f val
+    fmap f (Max val) = Max $ f val
+    fmap f (LV val) = LV $ f val
+    fmap f (Gt val) = Gt $ f val
+    fmap f (Lt val) = Lt $ f val
+    fmap f (Eq val) = Eq $ f val
+    fmap f (Op val) = Op $ map (fmap f) val
+
+instance Applicative GeneralParsedPacket where
+    pure = undefined
+    Sum f <*> val = fmap f val
+    Prod f <*> val = fmap f val
+    Min f <*> val = fmap f val
+    Max f <*> val = fmap f val
+    LV f <*> val = fmap f val
+    Gt f <*> val = fmap f val
+    Lt f <*> val = fmap f val
+    Eq f <*> val = fmap f val
+    Op f <*> val = Op $ map (<*> val) f
+
+getValue :: ParsedPacket -> [Int]
+getValue (Sum val) = [val]
+getValue (Prod val) = [val]
+getValue (Min val) = [val]
+getValue (Max val) = [val]
+getValue (LV val) = [val]
+getValue (Gt val) = [val]
+getValue (Lt val) = [val]
+getValue (Eq val) = [val]
+getValue (Op vals) = concatMap getValue vals
 
 input :: IO Hex
 input = head . lines <$> readFile "day_16_input.txt"
@@ -89,16 +141,6 @@ parseByPacketCountSumVersionNumbers sumOfVersionNums = helper sumOfVersionNums 0
           parsedSoFar = lengthParsed + acc
       in if newCount == n then ([parsed],parsedSoFar,newSum) else (\ (a,b,c) -> (parsed : a, b, c)) $ helper newSum newCount parsedSoFar n (drop lengthParsed packet)
 
-parseOperator :: Packet -> (ParsedPacket,Int)
-parseOperator packet =
-  let lengthTypeID = head packet
-      rest = tail packet
-      (numBitsCount, matchingFunc) = if lengthTypeID == 0 then (15, parseByTotalLength) else (11, parseByPacketCount)
-      num = bitsToInt . take numBitsCount $ rest
-      n = 7 + numBitsCount
-      payload = drop numBitsCount rest
-  in bimap Op (+n) $ matchingFunc num payload
-
 parseOperatorSumVersionNumbers :: Int -> Packet -> (ParsedPacket,Int,Int)
 parseOperatorSumVersionNumbers sumOfVersionNums packet =
   let lengthTypeID = head packet
@@ -112,13 +154,6 @@ parseOperatorSumVersionNumbers sumOfVersionNums packet =
 makePairIntoTripleWith :: c -> (a,b) -> (a,b,c)
 makePairIntoTripleWith el (a,b) = (a,b,el)
 
-parsePacket :: Packet -> (ParsedPacket,Int)
-parsePacket packet =
-  let (v,t,p) = separateHeader packet
-  in case t of
-       4 -> parseLiteralValue p
-       _ -> parseOperator p
-
 parsePacketSumVersionNumbers :: Int -> Packet -> (ParsedPacket,Int,Int)
 parsePacketSumVersionNumbers sumOfVersionNums packet =
   let (v,t,p) = separateHeader packet
@@ -129,3 +164,74 @@ parsePacketSumVersionNumbers sumOfVersionNums packet =
 
 firstPart :: IO Int
 firstPart = (\ (_,_,val) -> val) . parsePacketSumVersionNumbers 0 . hexToBits <$> input
+
+parsePacket :: Packet -> (ParsedPacket,Int)
+parsePacket packet =
+  let (v,t,p) = separateHeader packet
+  in case t of
+       4 -> parseLiteralValue p
+       _ -> parseOperator t p
+
+parseOperator :: TypeID -> Packet -> (ParsedPacket,Int)
+parseOperator typeID packet =
+  let lengthTypeID = head packet
+      rest = tail packet
+      (numBitsCount, matchingFunc) = if lengthTypeID == 0 then (15, parseByTotalLength) else (11, parseByPacketCount)
+      num = bitsToInt . take numBitsCount $ rest
+      n = 7 + numBitsCount
+      payload = drop numBitsCount rest
+      parsedSubPackets = bimap Op (+n) $ matchingFunc num payload
+  in summarizeResult typeID parsedSubPackets
+
+summarizeResult :: TypeID -> (ParsedPacket,Int) -> (ParsedPacket,Int)
+summarizeResult typeID (subPackets,sumOfVersionNums) =
+  case typeID of
+       0 -> sumSubPackets (subPackets,sumOfVersionNums)
+       1 -> multiplySubPackets (subPackets,sumOfVersionNums)
+       2 -> minimumOfSubPackets (subPackets,sumOfVersionNums)
+       3 -> maximumOfSubPackets (subPackets,sumOfVersionNums)
+       5 -> firstIsGreater (subPackets,sumOfVersionNums)
+       6 -> firstIsSmaller (subPackets,sumOfVersionNums)
+       7 -> areEqual (subPackets,sumOfVersionNums)
+       _ -> (subPackets,sumOfVersionNums)
+
+sumSubPackets :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+sumSubPackets (subPackets,sumOfVersionNums) =
+  let sumOfSubPacketVals = sum $ getValue subPackets
+  in (Sum sumOfSubPacketVals,sumOfVersionNums)
+
+multiplySubPackets :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+multiplySubPackets (subPackets,sumOfVersionNums) =
+  let productOfSubPacketVals = product $ getValue subPackets
+  in (Prod productOfSubPacketVals,sumOfVersionNums)
+
+minimumOfSubPackets :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+minimumOfSubPackets (subPackets,sumOfVersionNums) =
+  let minimumOfSubPacketVals = minimum $ getValue subPackets
+  in (Min minimumOfSubPacketVals,sumOfVersionNums)
+
+maximumOfSubPackets :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+maximumOfSubPackets (subPackets,sumOfVersionNums) =
+  let maximumOfSubPacketVals = maximum $ getValue subPackets
+  in (Max maximumOfSubPacketVals,sumOfVersionNums)
+
+firstIsGreater :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+firstIsGreater (subPackets,sumOfVersionNums) =
+  let subPacketVals = getValue subPackets
+      returnVal = if head subPacketVals > subPacketVals !! 1 then Gt 1 else Gt 0
+  in (returnVal,sumOfVersionNums)
+
+firstIsSmaller :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+firstIsSmaller (subPackets,sumOfVersionNums) =
+  let subPacketVals = getValue subPackets
+      returnVal = if head subPacketVals < subPacketVals !! 1 then Lt 1 else Lt 0
+  in (returnVal,sumOfVersionNums)
+
+areEqual :: (ParsedPacket,Int) -> (ParsedPacket,Int)
+areEqual (subPackets,sumOfVersionNums) =
+  let subPacketVals = getValue subPackets
+      returnVal = if head subPacketVals == subPacketVals !! 1 then Eq 1 else Eq 0
+  in (returnVal,sumOfVersionNums)
+
+secondPart :: IO Int
+secondPart = head . getValue . fst . parsePacket . hexToBits <$> input
