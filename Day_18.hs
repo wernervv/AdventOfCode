@@ -206,6 +206,14 @@ magnitude = uncurry (+) . bimap ((3*) . magnitudeElement) ((2*) . magnitudeEleme
 firstPart :: IO Int
 firstPart = magnitude . foldl1 addSnailfishNumbers <$> input
 
+allDifferentCombinations :: [a] -> [(a,a)]
+allDifferentCombinations ls =
+  let n = length ls -1
+  in [(ls !! i, ls !! j) | i <- [0..n], j <- [0..n], i /= j]
+
+secondPart :: IO Int
+secondPart = maximum . map (magnitude . uncurry addSnailfishNumbers) . allDifferentCombinations <$> input
+
 testInputs :: [String]
 testInputs = ["[1,2]", "[[1,2],3]", "[9,[8,7]]", "[[1,9],[8,5]]", "[[[[1,2],[3,4]],[[5,6],[7,8]]],9]", "[[[9,[3,8]],[[0,9],6]],[[[3,7],[4,9]],3]]", "[[[[1,3],[5,3]],[[1,3],[8,7]]],[[[4,9],[6,9]],[[8,2],[7,3]]]]"]
 
