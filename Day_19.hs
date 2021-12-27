@@ -225,6 +225,27 @@ countAllBeacons input =
 firstPart :: IO Int
 firstPart = countAllBeacons <$> input
 
+giveAllScannerLocations :: [(Instruction,Int)] -> [(Int,Int)] -> [[Coord]] -> [Coord]
+giveAllScannerLocations instructionsByID unchecked input =
+  if instructionsCoverAll instructionsByID unchecked
+    then map (snd . fst) instructionsByID
+    else let (newInstructions, newUnchecked) = moreInstructions instructionsByID unchecked input
+         in giveAllScannerLocations newInstructions newUnchecked input
+
+manhattanDistance :: Coord -> Coord -> Int
+manhattanDistance a b =
+  let (dx,dy,dz) = coordMinus a b
+      in abs dx + abs dy + abs dz
+
+maxManhattanDistance :: [Coord] -> Int
+maxManhattanDistance = maximum . map (uncurry manhattanDistance) . allDifferentPairs
+
+maxManhattanFromInput :: [[Coord]] -> Int
+maxManhattanFromInput input = maxManhattanDistance $ giveAllScannerLocations idInstructions (allScannerPairs input) input
+
+secondPart :: IO Int
+secondPart = maxManhattanFromInput <$> input
+
 testInputRaw :: [String]
 testInputRaw = ["404,-588,-901"
             ,"528,-643,409"
