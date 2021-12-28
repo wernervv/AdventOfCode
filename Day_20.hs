@@ -62,3 +62,10 @@ lightPixelsAfterTwoEnhancements (a,i) = countLightPixels . fst $ enhanceImage (e
 
 firstPart :: IO Int
 firstPart = lightPixelsAfterTwoEnhancements . parseInput <$> input
+
+enhanceNTimes :: Int -> InfiniteImage -> Algorithm -> InfiniteImage
+enhanceNTimes 0 i _ = i
+enhanceNTimes n i a = enhanceNTimes (n-1) (enhanceImage i a) a
+
+secondPart :: IO Int
+secondPart = countLightPixels . fst . uncurry (enhanceNTimes 50) . (\ (a,i) -> (toInfiniteImage i '.',a)) . parseInput <$> input
