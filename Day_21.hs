@@ -1,6 +1,8 @@
 {-# LANGUAGE TupleSections #-}
 
 import Data.Bifunctor(bimap)
+import Data.List(group,sort)
+import Data.Maybe(fromMaybe)
 
 type PlayersStatus = (Player,Player,Bool) -- player 1, player 2, player 1 is in turn
 type Player = (Int,Int) -- position, points
@@ -98,3 +100,61 @@ endSituationScore g@(ps,_) =
 
 firstPart :: IO Int
 firstPart = endSituationScore . initializeGame <$> input
+
+type FrequencyList = [(Int,Int)] -- number of turns to reach 21 [in this case], amount of such numbers
+
+combineOne :: FrequencyList -> (Int,Int) -> FrequencyList
+combineOne [] val = [val]
+combineOne ((val,count):rest) (x,n) = if x == val then (val,count + n) : rest else (val,count) : combineOne rest (x,n)
+
+combineFrequencyLists :: FrequencyList -> FrequencyList -> FrequencyList
+combineFrequencyLists fl1 fl2 = foldl combineOne fl2 fl1
+
+splitByPoints :: [(Player,Int)] -> (Int,[(Player,Int)])
+splitByPoints [] = (0,[])
+splitByPoints ((p,n):rest) =
+  if snd p >= 21 then (\ (w,lp) -> (w+n,lp)) $ splitByPoints rest else (\ (w,lp) -> (w,(p,n):lp)) $ splitByPoints rest
+
+afterOneMove :: Player -> (Int,[(Player,Int)])
+afterOneMove p =
+  let allSteps = map (\ l -> (head l, length l)) . group . sort $ [ (\ (a,b,c) -> a+b+c) (x,y,z) | x <- [1..3], y <- [1..3], z <- [1..3]]
+      allOutComes = map (\ (x,n) -> (moveSteps x p,n)) allSteps
+  in splitByPoints allOutComes
+
+multiplyFL :: Int -> FrequencyList -> FrequencyList
+multiplyFL n = map (\ (x,m) -> (x,m*n))
+
+addStepsToFL :: Int -> FrequencyList -> FrequencyList
+addStepsToFL n = map (\ (x,m) -> (x+n,m))
+
+getFrequencyList :: Player -> FrequencyList
+getFrequencyList = helper 0
+  where
+    helper n p =
+      let (wins,stillGoing) = afterOneMove p
+          currentFL = [(n+1,wins) | wins /= 0]
+      in if null stillGoing
+           then currentFL
+           else combineFrequencyLists currentFL $ foldl1 combineFrequencyLists $ map (\ (p,m) -> multiplyFL m . addStepsToFL (n+1) $ getFrequencyList p) stillGoing
+
+countNumberOfPaths :: FrequencyList -> Int
+countNumberOfPaths = foldr ((+) . snd) 0
+
+winsTotal :: (FrequencyList,FrequencyList,Bool) -> Int -> (Int,Int) -> (Int,Int)
+winsTotal (fl1,fl2,fpsTurn) openPaths winsSoFar =
+  if openPaths == 0 then winsSoFar else
+  let currentList = if fpsTurn then fl1 else fl2
+      endingNow = fromMaybe 0 (lookup 1 currentList)
+      wins = endingNow * openPaths
+      newWins = if fpsTurn then (fst winsSoFar + wins, snd winsSoFar) else (fst winsSoFar, snd winsSoFar + wins)
+      remainingList = filter (\ el -> fst el > 0) (map (\ (x,n) -> (x-1,n)) currentList)
+      openPossibilities = countNumberOfPaths remainingList
+      newOpenPaths = openPaths * openPossibilities
+      modifiedLists = if fpsTurn then (remainingList,fl2,not fpsTurn) else (fl1,remainingList,not fpsTurn)
+  in winsTotal modifiedLists newOpenPaths newWins
+
+calculateHigherWinScore :: PlayersStatus -> Int
+calculateHigherWinScore = uncurry max . (\ ffb -> winsTotal ffb 1 (0,0)) . (\ (a,b,c) -> (getFrequencyList a, getFrequencyList b, c))
+
+secondPart :: IO Int
+secondPart = calculateHigherWinScore . initializePlayers <$> input
