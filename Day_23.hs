@@ -1,4 +1,4 @@
-import Data.List(minimumBy,sortBy)
+import Data.List(group,minimumBy,partition,sortBy,sort)
 import Data.Maybe(catMaybes,mapMaybe)
 
 data BurrowSpace a = HW a | SR (a,a)
@@ -63,8 +63,8 @@ allToTargets b =
           Nothing -> helper rest b
           (Just newB) -> allToTargets newB
 
-branch :: Estimate -> Amphipod -> [Estimate]
-branch (b,e) a = map tagWithEstimate . mapMaybe (\ (i,_) -> moveToGiven i a b) $ hallWay b
+-- branch :: Estimate -> Amphipod -> [Estimate]
+-- branch (b,e) a = map tagWithEstimate . mapMaybe (\ (i,_) -> moveToGiven i a b) $ hallWay b
 
 allAmphipods :: [BurrowUnit] -> [Amphipod]
 allAmphipods [] = []
@@ -78,8 +78,118 @@ scoreToSpanHorizontalDistance a@(c,x) b =
   let t = getTargetRoomXCoord a b
   in getMoveCost c $ abs (t - x)
 
-countGhostScore :: Burrow -> Int
-countGhostScore b = (4444 +) . sum . map (`scoreToSpanHorizontalDistance` b) $ allAmphipods (fst b)
+roomsContainingAmphipod :: Char -> Burrow -> [BurrowUnit]
+roomsContainingAmphipod c = filter (\ (_,SR (c1,c2)) -> c1 == c || c2 == c) . sideRooms
+
+stepsToOutsideOfTarget :: Int -> Char -> BurrowUnit -> Int
+stepsToOutsideOfTarget target c (x,SR (c1,_)) =
+  let toHallway = if c1 == c then 1 else 2
+      distance = abs (target - x)
+  in toHallway + distance
+stepsToOutsideOfTarget _ _ _ = 0
+
+hasCharOnBottom :: Char -> BurrowUnit -> Bool
+hasCharOnBottom c (_,SR (_,c2)) = c == c2
+hasCharOnBottom _ _ = False
+
+absoluteMinimumCostChar :: Char -> Burrow -> Int
+absoluteMinimumCostChar c b =
+  let rooms = roomsContainingAmphipod c b
+      target = getTargetRoomXCoord (c,0) b
+      (inside,outside) = partition ((== target) . fst) rooms
+  in case length inside of
+       2 -> 0
+       0 -> getMoveCost c . (3+) . sum . map (stepsToOutsideOfTarget target c) $ outside
+       _ -> if hasCharOnBottom c (head inside)
+              then getMoveCost c . (1+) . stepsToOutsideOfTarget target c . head $ outside
+              else getMoveCost c . (3+) . sum . map (stepsToOutsideOfTarget target c) $ rooms
+
+isInRightRoomWrongPos :: Char -> Burrow -> Bool
+isInRightRoomWrongPos c b =
+  let target = getTargetRoomXCoord (c,0) b
+      (_,SR (c1,c2)) = head . filter (\ p -> fst p == target) $ sideRooms b
+      res
+        | c2 == c = False
+        | c1 == c = True
+        | otherwise = False
+  in res
+
+followLoop :: Int -> Char -> Burrow -> [Amphipod] -> [[Amphipod]]
+followLoop 0 _ _ as = [as]
+followLoop n c b as@(a:_) =
+  let target = getTargetRoomXCoord a b
+      (_,SR (c1,c2)) = head . filter (\ p -> fst p == target) $ sideRooms b
+      branch1 = if c1 < c || c1 == fst a then [] else (c1,target) : as
+      branch2 = if c2 < c || c2 == fst a then [] else (c2,target) : as
+  in concatMap (followLoop (n-1) c b) [branch1,branch2]
+followLoop _ _ _ _ = []
+
+hasChar :: Char -> BurrowUnit -> Bool
+hasChar c (_,SR (c1,c2)) = c1 == c || c2 == c
+hasChar _ _ = False
+
+getAmphipodsByChar :: Char -> Burrow -> (Amphipod,Amphipod)
+getAmphipodsByChar c b =
+  let roomsContaining = filter (hasChar c) $ sideRooms b
+  in if length roomsContaining == 1
+       then let x = fst . head $ roomsContaining in ((c,x),(c,x))
+       else let x1 = fst . head $ roomsContaining
+                x2 = fst . last $ roomsContaining
+            in ((c,x1),(c,x2))
+
+isPartOfLoop :: Int -> Char -> Burrow -> [(Bool,Int)]
+isPartOfLoop n c b =
+  let (a1,a2) = getAmphipodsByChar c b
+      firstInLoop = any (\ ls -> length ls == (n+1) && head ls == last ls) (followLoop n c b [a1])
+      firstX = snd a1
+      secondInLoop = any (\ ls -> length ls == (n+1) && head ls == last ls) (followLoop n c b [a2])
+      secondX = snd a2
+  in [(firstInLoop,firstX),(secondInLoop,secondX)]
+
+countDistinctLoops :: [(Bool,Int)] -> Int
+countDistinctLoops = length . group . sort . filter fst
+
+dodgeScoreD :: Burrow -> Int
+dodgeScoreD b = if isInRightRoomWrongPos 'D' b then getMoveCost 'D' 2 else 0
+
+dodgeScoreC :: Burrow -> Int
+dodgeScoreC b =
+  let badPos = if isInRightRoomWrongPos 'C' b then 2 else 0
+      stepsForBreakingLoops = (2*) . length . filter fst $ isPartOfLoop 2 'C' b
+  in getMoveCost 'C' $ badPos + stepsForBreakingLoops
+
+dodgeScoreB :: Burrow -> Int
+dodgeScoreB b =
+  let badPos = if isInRightRoomWrongPos 'B' b then 2 else 0
+      twoLoops = isPartOfLoop 2 'B' b
+      threeLoops = isPartOfLoop 3 'B' b
+      stepsForBreakingLoops
+        | (length . filter fst $ twoLoops) == 2 = 4
+        | (length . filter fst $ threeLoops) == 2 = 4
+        | otherwise = (2*) . countDistinctLoops $ twoLoops ++ threeLoops
+  in getMoveCost 'C' $ badPos + stepsForBreakingLoops
+
+dodgeScoreA :: Burrow -> Int
+dodgeScoreA b =
+  let badPos = if isInRightRoomWrongPos 'A' b then 2 else 0
+      twoLoops = isPartOfLoop 2 'A' b
+      threeLoops = isPartOfLoop 3 'A' b
+      fourLoops = isPartOfLoop 4 'A' b
+      stepsForBreakingLoops
+        | (length . filter fst $ twoLoops) == 2 = 4
+        | (length . filter fst $ threeLoops) == 2 = 4
+        | (length . filter fst $ fourLoops) == 2 = 4
+        | otherwise = (2*) . countDistinctLoops $ twoLoops ++ threeLoops ++ fourLoops
+  in getMoveCost 'C' $ badPos + stepsForBreakingLoops
+
+dodgeScore :: Burrow -> Int
+dodgeScore b = dodgeScoreD b + dodgeScoreC b + dodgeScoreB b + dodgeScoreA b
+
+absoluteMinimumCost :: Burrow -> Int
+absoluteMinimumCost b = sum . map (`absoluteMinimumCostChar` b) $ "ABCD"
+
+smallestCost :: Burrow -> Int
+smallestCost b = absoluteMinimumCost b + dodgeScore b
 
 giveCheapest :: [Amphipod] -> Maybe Amphipod
 giveCheapest [] = Nothing
@@ -91,18 +201,18 @@ giveSmallestDodgeCost b =
       cheapest = giveCheapest . filter (isInRange range) $ movableAmphipods b
   in maybe 0 ((`getMoveCost` 2) . fst) cheapest
 
-countEstimate :: Burrow -> Int
-countEstimate b =
-  let ghostScore = countGhostScore b
-      smallestDodge = giveSmallestDodgeCost b
-  in ghostScore + smallestDodge
+-- countEstimate :: Burrow -> Int
+-- countEstimate b =
+--   let ghostScore = countGhostScore b
+--       smallestDodge = giveSmallestDodgeCost b
+--   in ghostScore + smallestDodge
 
-transitions :: Estimate -> [Estimate]
-transitions (b,e) =
-  let allMovedToTargets = allToTargets b
-      newEstimate = countEstimate allMovedToTargets
-      relevant = relevantAmphipods allMovedToTargets
-  in sortBy (\ a b -> compare (snd a) (snd b)) $ concatMap (branch (allMovedToTargets,newEstimate)) relevant
+-- transitions :: Estimate -> [Estimate]
+-- transitions (b,e) =
+--   let allMovedToTargets = allToTargets b
+--       newEstimate = countEstimate allMovedToTargets
+--       relevant = relevantAmphipods allMovedToTargets
+--   in sortBy (\ a b -> compare (snd a) (snd b)) $ concatMap (branch (allMovedToTargets,newEstimate)) relevant
 
 hallWay :: Burrow -> [BurrowUnit]
 hallWay ([],_) = []
@@ -256,25 +366,25 @@ addOneToEstimates orig@(e:es) newE = if snd newE <= snd e then newE : orig else 
 addToEstimates :: [Estimate] -> [Estimate] -> [Estimate]
 addToEstimates = foldl addOneToEstimates
 
-findCheaper :: Int -> [Estimate] -> Int
-findCheaper cheapest [] = cheapest
-findCheaper cheapest (e:es) =
-  if snd e >= cheapest
-    then cheapest
-    else findCheaper cheapest . addToEstimates es $ transitions e
+-- findCheaper :: Int -> [Estimate] -> Int
+-- findCheaper cheapest [] = cheapest
+-- findCheaper cheapest (e:es) =
+--   if snd e >= cheapest
+--     then cheapest
+--     else findCheaper cheapest . addToEstimates es $ transitions e
 
-cheapestEndState :: [Estimate] -> Int
-cheapestEndState [] = maxBound
-cheapestEndState ((b,e):rest) =
-  if isEndState b
-    then snd b
-    else cheapestEndState . addToEstimates rest $ transitions (b,e)
+-- cheapestEndState :: [Estimate] -> Int
+-- cheapestEndState [] = maxBound
+-- cheapestEndState ((b,e):rest) =
+--   if isEndState b
+--     then snd b
+--     else cheapestEndState . addToEstimates rest $ transitions (b,e)
 
-tagWithEstimate :: Burrow -> Estimate
-tagWithEstimate b = (b,countEstimate b)
+-- tagWithEstimate :: Burrow -> Estimate
+-- tagWithEstimate b = (b,countEstimate b)
 
 firstPart :: IO Int
-firstPart = cheapestEndState . (:[]) . tagWithEstimate . parseAsBurrow <$> input
+firstPart = smallestCost . parseAsBurrow <$> input
 
 i1 :: [String]
 i1 = ["#############"
