@@ -1,3 +1,4 @@
+import Data.Bifunctor(first,second)
 import Data.List(group,minimumBy,partition,sortBy,sort)
 import Data.Maybe(catMaybes,mapMaybe)
 
@@ -6,6 +7,7 @@ type BurrowUnit = (Int,BurrowSpace Char)
 type Burrow = ([BurrowUnit],Int)
 type Estimate = (Burrow,Int)
 type Amphipod = (Char,Int)
+type Dodges = [(Char,Int)]
 
 instance Show a => Show (BurrowSpace a) where
   show (HW val) = show val
@@ -167,7 +169,7 @@ dodgeScoreB b =
         | (length . filter fst $ twoLoops) == 2 = 4
         | (length . filter fst $ threeLoops) == 2 = 4
         | otherwise = (2*) . countDistinctLoops $ twoLoops ++ threeLoops
-  in getMoveCost 'C' $ badPos + stepsForBreakingLoops
+  in getMoveCost 'B' $ badPos + stepsForBreakingLoops
 
 dodgeScoreA :: Burrow -> Int
 dodgeScoreA b =
@@ -180,7 +182,48 @@ dodgeScoreA b =
         | (length . filter fst $ threeLoops) == 2 = 4
         | (length . filter fst $ fourLoops) == 2 = 4
         | otherwise = (2*) . countDistinctLoops $ twoLoops ++ threeLoops ++ fourLoops
-  in getMoveCost 'C' $ badPos + stepsForBreakingLoops
+  in getMoveCost 'A' $ badPos + stepsForBreakingLoops
+
+countDodgesD :: Burrow -> Int
+countDodgesD b = if isInRightRoomWrongPos 'D' b then 1 else 0
+
+countDodgesC :: Burrow -> Int
+countDodgesC b =
+  let badPos = if isInRightRoomWrongPos 'C' b then 1 else 0
+      dodgesForBreakingLoops = length . filter fst $ isPartOfLoop 2 'C' b
+  in badPos + dodgesForBreakingLoops
+
+countDodgesB :: Burrow -> Int
+countDodgesB b =
+  let badPos = if isInRightRoomWrongPos 'B' b then 1 else 0
+      twoLoops = isPartOfLoop 2 'B' b
+      threeLoops = isPartOfLoop 3 'B' b
+      dodgesForBreakingLoops
+        | (length . filter fst $ twoLoops) == 2 = 2
+        | (length . filter fst $ threeLoops) == 2 = 2
+        | otherwise = countDistinctLoops $ twoLoops ++ threeLoops
+  in badPos + dodgesForBreakingLoops
+
+countDodgesA :: Burrow -> Int
+countDodgesA b =
+  let badPos = if isInRightRoomWrongPos 'A' b then 1 else 0
+      twoLoops = isPartOfLoop 2 'A' b
+      threeLoops = isPartOfLoop 3 'A' b
+      fourLoops = isPartOfLoop 4 'A' b
+      dodgesForBreakingLoops
+        | (length . filter fst $ twoLoops) == 2 = 2
+        | (length . filter fst $ threeLoops) == 2 = 2
+        | (length . filter fst $ fourLoops) == 2 = 2
+        | otherwise = countDistinctLoops $ twoLoops ++ threeLoops ++ fourLoops
+  in badPos + dodgesForBreakingLoops
+
+dodgeCount :: Burrow -> Dodges
+dodgeCount b =
+  let da = countDodgesA b
+      db = countDodgesB b
+      dc = countDodgesC b
+      dd = countDodgesD b
+  in [('A',da),('B',db),('C',dc),('D',dd)]
 
 dodgeScore :: Burrow -> Int
 dodgeScore b = dodgeScoreD b + dodgeScoreC b + dodgeScoreB b + dodgeScoreA b
@@ -383,8 +426,44 @@ addToEstimates = foldl addOneToEstimates
 -- tagWithEstimate :: Burrow -> Estimate
 -- tagWithEstimate b = (b,countEstimate b)
 
+combineOne :: (Burrow,Dodges) -> [(Burrow,Dodges)] -> [(Burrow,Dodges)]
+combineOne bd [] = []
+combineOne bd@((_,cost),_) (currentFirst@((_,currentCost),_):rest) =
+  if cost <= currentCost
+    then bd : currentFirst : rest
+    else currentFirst : combineOne bd rest
+
+combineStates :: [(Burrow,Dodges)] -> [(Burrow,Dodges)] -> [(Burrow,Dodges)]
+combineStates toAdd current = foldl (flip combineOne) current toAdd
+
+removeDodged :: Char -> Dodges -> Dodges
+removeDodged _ [] = []
+removeDodged c (d:ds)
+  | fst d /= c = removeDodged c ds
+  | snd d == 1 = ds
+  | otherwise = second (\ n -> n-1) d : ds
+
+nextStates :: Burrow -> Dodges -> [(Burrow,Dodges)]
+nextStates b ds =
+  let (small,big) = relevantRange b
+      movable = relevantAmphipods b
+      allMoves = concatMap (\ a -> zip (mapMaybe (\ i -> moveToGiven i a b) [small..big]) (repeat $ removeDodged (fst a) ds)) movable
+  in map (first allToTargets) allMoves
+
+costOfEndState :: [(Burrow,Dodges)] -> Int
+costOfEndState [] = maxBound
+costOfEndState ((b,ds):rest) =
+  if isEndState b
+    then snd b
+    else costOfEndState . combineStates (nextStates b ds) $ rest
+
+smallestEnd :: Burrow -> Int
+smallestEnd b =
+  let dodges = dodgeCount b
+  in costOfEndState [(b,dodges)]
+
 firstPart :: IO Int
-firstPart = smallestCost . parseAsBurrow <$> input
+firstPart = smallestEnd . parseAsBurrow <$> input
 
 i1 :: [String]
 i1 = ["#############"
