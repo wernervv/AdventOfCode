@@ -7,7 +7,7 @@ type BurrowUnit = (Int,BurrowSpace Char)
 type Burrow = ([BurrowUnit],Int)
 type Estimate = (Burrow,Int)
 type Amphipod = (Char,Int)
-type Dodges = [(Char,Int)]
+type Dodges = [Amphipod]
 
 instance Show a => Show (BurrowSpace a) where
   show (HW val) = show val
@@ -55,15 +55,17 @@ relevantAmphipods b = filter (\ a -> not (alreadyCorrect a b) && isInRange (rele
 
 allToTargets :: Burrow -> Burrow
 allToTargets b =
-  let as = movableAmphipods b
+  let as = movableAmphipods b ++ lockedAmphipods b
       aAndT = zip as (map (`getTargetRoomXCoord` b) as)
   in helper aAndT b
     where
       helper [] b = b
       helper ((a,x):rest) b =
-        case moveToGiven x a b of
-          Nothing -> helper rest b
-          (Just newB) -> allToTargets newB
+        if snd a == x
+          then helper rest b
+          else case moveToGiven x a b of
+                 Nothing -> helper rest b
+                 (Just newB) -> allToTargets newB
 
 -- branch :: Estimate -> Amphipod -> [Estimate]
 -- branch (b,e) a = map tagWithEstimate . mapMaybe (\ (i,_) -> moveToGiven i a b) $ hallWay b
@@ -139,18 +141,17 @@ getAmphipodsByChar c b =
                 x2 = fst . last $ roomsContaining
             in ((c,x1),(c,x2))
 
-isPartOfLoop :: Int -> Char -> Burrow -> [(Bool,Int)]
-isPartOfLoop n c b =
+loopStartingPoints :: Int -> Char -> Burrow -> [Amphipod]
+loopStartingPoints n c b =
   let (a1,a2) = getAmphipodsByChar c b
-      firstInLoop = any (\ ls -> length ls == (n+1) && head ls == last ls) (followLoop n c b [a1])
-      firstX = snd a1
-      secondInLoop = any (\ ls -> length ls == (n+1) && head ls == last ls) (followLoop n c b [a2])
-      secondX = snd a2
-  in [(firstInLoop,firstX),(secondInLoop,secondX)]
+      firstStart = [a1 | any (\ ls -> length ls == (n+1) && head ls == last ls) (followLoop n c b [a1])]
+      secondStart = [a2 | any (\ ls -> length ls == (n+1) && head ls == last ls) (followLoop n c b [a2])]
+  in firstStart ++ secondStart
 
 countDistinctLoops :: [(Bool,Int)] -> Int
 countDistinctLoops = length . group . sort . filter fst
 
+{-
 dodgeScoreD :: Burrow -> Int
 dodgeScoreD b = if isInRightRoomWrongPos 'D' b then getMoveCost 'D' 2 else 0
 
@@ -183,56 +184,45 @@ dodgeScoreA b =
         | (length . filter fst $ fourLoops) == 2 = 4
         | otherwise = (2*) . countDistinctLoops $ twoLoops ++ threeLoops ++ fourLoops
   in getMoveCost 'A' $ badPos + stepsForBreakingLoops
+-}
 
-countDodgesD :: Burrow -> Int
-countDodgesD b = if isInRightRoomWrongPos 'D' b then 1 else 0
+countDodgesD :: Burrow -> [Amphipod]
+countDodgesD b = [('D',getTargetRoomXCoord ('D',0) b) | isInRightRoomWrongPos 'D' b]
 
-countDodgesC :: Burrow -> Int
+countDodgesC :: Burrow -> [Amphipod]
 countDodgesC b =
-  let badPos = if isInRightRoomWrongPos 'C' b then 1 else 0
-      dodgesForBreakingLoops = length . filter fst $ isPartOfLoop 2 'C' b
-  in badPos + dodgesForBreakingLoops
+  let badPos = [('C',getTargetRoomXCoord ('C',0) b) | isInRightRoomWrongPos 'C' b]
+      dodgesForBreakingLoops = loopStartingPoints 2 'C' b
+  in badPos ++ dodgesForBreakingLoops
 
-countDodgesB :: Burrow -> Int
+countDodgesB :: Burrow -> [Amphipod]
 countDodgesB b =
-  let badPos = if isInRightRoomWrongPos 'B' b then 1 else 0
-      twoLoops = isPartOfLoop 2 'B' b
-      threeLoops = isPartOfLoop 3 'B' b
-      dodgesForBreakingLoops
-        | (length . filter fst $ twoLoops) == 2 = 2
-        | (length . filter fst $ threeLoops) == 2 = 2
-        | otherwise = countDistinctLoops $ twoLoops ++ threeLoops
-  in badPos + dodgesForBreakingLoops
+  let badPos = [('B',getTargetRoomXCoord ('B',0) b) | isInRightRoomWrongPos 'B' b]
+      twoLoops = loopStartingPoints 2 'B' b
+      threeLoops = loopStartingPoints 3 'B' b
+      dodgesForBreakingLoops = twoLoops ++ threeLoops
+  in badPos ++ dodgesForBreakingLoops
 
-countDodgesA :: Burrow -> Int
+countDodgesA :: Burrow -> [Amphipod]
 countDodgesA b =
-  let badPos = if isInRightRoomWrongPos 'A' b then 1 else 0
-      twoLoops = isPartOfLoop 2 'A' b
-      threeLoops = isPartOfLoop 3 'A' b
-      fourLoops = isPartOfLoop 4 'A' b
-      dodgesForBreakingLoops
-        | (length . filter fst $ twoLoops) == 2 = 2
-        | (length . filter fst $ threeLoops) == 2 = 2
-        | (length . filter fst $ fourLoops) == 2 = 2
-        | otherwise = countDistinctLoops $ twoLoops ++ threeLoops ++ fourLoops
-  in badPos + dodgesForBreakingLoops
+  let badPos = [('A',getTargetRoomXCoord ('A',0) b) | isInRightRoomWrongPos 'A' b]
+      twoLoops = loopStartingPoints 2 'A' b
+      threeLoops = loopStartingPoints 3 'A' b
+      fourLoops = loopStartingPoints 4 'A' b
+      dodgesForBreakingLoops = twoLoops ++ threeLoops ++ fourLoops
+  in badPos ++ dodgesForBreakingLoops
 
 dodgeCount :: Burrow -> Dodges
-dodgeCount b =
-  let da = countDodgesA b
-      db = countDodgesB b
-      dc = countDodgesC b
-      dd = countDodgesD b
-  in [('A',da),('B',db),('C',dc),('D',dd)]
+dodgeCount b = countDodgesA b ++ countDodgesB b ++ countDodgesC b ++ countDodgesD b
 
-dodgeScore :: Burrow -> Int
-dodgeScore b = dodgeScoreD b + dodgeScoreC b + dodgeScoreB b + dodgeScoreA b
+-- dodgeScore :: Burrow -> Int
+-- dodgeScore b = dodgeScoreD b + dodgeScoreC b + dodgeScoreB b + dodgeScoreA b
 
 absoluteMinimumCost :: Burrow -> Int
 absoluteMinimumCost b = sum . map (`absoluteMinimumCostChar` b) $ "ABCD"
 
-smallestCost :: Burrow -> Int
-smallestCost b = absoluteMinimumCost b + dodgeScore b
+-- smallestCost :: Burrow -> Int
+-- smallestCost b = absoluteMinimumCost b + dodgeScore b
 
 giveCheapest :: [Amphipod] -> Maybe Amphipod
 giveCheapest [] = Nothing
@@ -427,7 +417,7 @@ addToEstimates = foldl addOneToEstimates
 -- tagWithEstimate b = (b,countEstimate b)
 
 combineOne :: (Burrow,Dodges) -> [(Burrow,Dodges)] -> [(Burrow,Dodges)]
-combineOne bd [] = []
+combineOne bd [] = [bd]
 combineOne bd@((_,cost),_) (currentFirst@((_,currentCost),_):rest) =
   if cost <= currentCost
     then bd : currentFirst : rest
@@ -436,18 +426,15 @@ combineOne bd@((_,cost),_) (currentFirst@((_,currentCost),_):rest) =
 combineStates :: [(Burrow,Dodges)] -> [(Burrow,Dodges)] -> [(Burrow,Dodges)]
 combineStates toAdd current = foldl (flip combineOne) current toAdd
 
-removeDodged :: Char -> Dodges -> Dodges
+removeDodged :: Amphipod -> Dodges -> Dodges
 removeDodged _ [] = []
-removeDodged c (d:ds)
-  | fst d /= c = removeDodged c ds
-  | snd d == 1 = ds
-  | otherwise = second (\ n -> n-1) d : ds
+removeDodged a (d:ds) = if d == a then ds else d : removeDodged a ds
 
 nextStates :: Burrow -> Dodges -> [(Burrow,Dodges)]
 nextStates b ds =
   let (small,big) = relevantRange b
-      movable = relevantAmphipods b
-      allMoves = concatMap (\ a -> zip (mapMaybe (\ i -> moveToGiven i a b) [small..big]) (repeat $ removeDodged (fst a) ds)) movable
+      movable = filter (`elem` ds) $ relevantAmphipods b
+      allMoves = concatMap (\ a -> zip (mapMaybe (\ i -> moveToGiven i a b) [small..big]) (repeat $ removeDodged a ds)) movable
   in map (first allToTargets) allMoves
 
 costOfEndState :: [(Burrow,Dodges)] -> Int
