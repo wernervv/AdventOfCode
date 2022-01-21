@@ -1,8 +1,117 @@
 import Data.Char(digitToInt,intToDigit)
 import Data.List.Split(splitOn)
+import Data.Maybe(fromMaybe, mapMaybe)
 
 type ALU = (Int,Int,Int,Int)
 type ALUString = (String,String,String,String)
+
+type Z = (Variable,Variable)
+
+extractPrevious :: Z -> Z
+extractPrevious z@(n,_) =
+  case n of
+    (Add (Mul oldN (Val 26)) oldR) -> (oldN,oldR)
+    _ -> z
+
+f :: Int -> Bool -> Z -> Z
+f round xEqualsW z@(n,r) =
+  let (d,t1,t2) = fromMaybe (0,0,0) (lookup round constants)
+      newR = reduceAdd (Var (['a'..] !! (round - 1))) (Val t2)
+  in if d == 1
+       then if xEqualsW
+              then z
+              else (reduceAdd (reduceMultiply n (Val 26)) r, newR)
+       else if xEqualsW
+              then extractPrevious z
+              else (n, newR)
+
+applyOneRound :: (Bool,(Int,Int,Int),Maybe (Int,Int)) -> Int -> (Int,Int) -> (Int,Int)
+applyOneRound (xEqualsW,(d,t1,t2),mRange) w (n,r) =
+  let tmpZ = (26 * n + r) `div` d
+      newZ = if r + t1 == w
+               then 26 * tmpZ + w + t2
+               else tmpZ
+  in (tmpZ `div` 26, tmpZ `mod` 26)
+
+allPaths :: [[Bool]]
+allPaths = [ [a,b,c,d,e,f,g,h,i,j,k,l,m,n] | a <- [True,False], b <- [True,False], c <- [True,False], d <- [True,False], e <- [True,False], f <- [True,False], g <- [True,False], h <- [True,False], i <- [True,False], j <- [True,False], k <- [True,False], l <- [True,False], m <- [True,False], n <- [True,False]]
+
+removeImpossible :: [Bool] -> Maybe [(Bool,(Int,Int,Int))]
+removeImpossible bs =
+  let bvars = zip bs (map (\ n -> fromMaybe undefined (lookup n constants)) [1..14])
+      layerCounts = scanl (\ count (b,(d,_,_)) -> if not b && d == 1 then count+1 else if b && d == 26 then max 0 (count-1) else count) 0 bvars
+  in if last layerCounts == 0
+       then Just bvars
+       else Nothing
+
+overlap :: (Int,Int) -> (Int,Int) -> (Int,Int)
+overlap (x1,y1) (x2,y2) = (max x1 x2, min y1 y2)
+
+shrinkRange :: (Int,Int) -> (Bool,(Int,Int,Int),Maybe (Int,Int)) -> (Bool,(Int,Int,Int),Maybe (Int,Int))
+shrinkRange (minR,maxR) (b,vars@(_,_,t2),mRange) =
+  let currentRange = fromMaybe (1,9) mRange
+      acceptedRange = (minR - t2, maxR - t2)
+      newR = overlap currentRange acceptedRange
+  in (b,vars,Just newR)
+
+modifyNextR :: [(Bool,(Int,Int,Int),Maybe (Int,Int))] -> (Bool,(Int,Int,Int),Maybe (Int,Int)) -> [(Bool,(Int,Int,Int),Maybe (Int,Int))]
+modifyNextR = helper 0
+  where
+    helper _ [] current = []
+    helper skipCount orig@(next@(xEqualsW,(d,t1,t2),mRange):rest) current@(currentB,(currentD,currentT1,currentT2),currentMRange)
+      | not currentB = orig
+      | xEqualsW = if d == 1
+                     then next : helper skipCount rest current
+                     else next : helper (skipCount+1) rest current
+      | skipCount > 0 = next : helper (skipCount-1) rest current
+      | otherwise = shrinkRange (1-currentT1, 9-currentT1) next : rest
+
+allRangesAreValid :: [(Bool,(Int,Int,Int),Maybe (Int,Int))] -> Bool
+allRangesAreValid = all (\ (_,_,mRange) ->  maybe True (uncurry (<=)) mRange)
+
+tagWithRange :: [(Bool,(Int,Int,Int))] -> Maybe [(Bool,(Int,Int,Int),Maybe (Int,Int))]
+tagWithRange = helper [] . reverse . map (\ (a,b) -> (a,b,Nothing))
+  where
+    helper acc [] = if allRangesAreValid acc then Just acc else Nothing
+    helper acc (vars:rest) =
+      let modified = modifyNextR rest vars
+      in helper (vars:acc) modified
+
+biggestFulfilling :: [(Bool,(Int,Int,Int),Maybe (Int,Int))] -> Maybe [Char]
+biggestFulfilling = helper (0,0) []
+  where
+    helper _ acc [] = Just . reverse $ acc
+    helper z@(n,r) acc (vars@(xEqualsW,(d,t1,t2),mRange):rest) =
+      let usableRange = reverse . filter (\ w -> if xEqualsW then w == r + t2 else w /= r + t2) . (\ p -> [(fst p)..(snd p)]) $ fromMaybe (1,9) mRange
+      in if null usableRange
+           then Nothing
+           else case helper (applyOneRound vars (head usableRange) z) ((intToDigit . head $ usableRange) : acc) rest of
+                  Nothing -> if null (tail usableRange) then Nothing else helper z acc ((xEqualsW,(d,t1,t2), Just (head $ tail usableRange,last $ tail usableRange)):rest)
+                  Just cs -> Just cs
+
+allCombinationsWithOne :: a -> [a] -> [[a]]
+allCombinationsWithOne a [] = [[a]]
+allCombinationsWithOne a bs = map ((a:) . (:[])) bs
+
+-- allCombinations :: [a] -> [a] -> [[a]]
+-- allCombinations f s = concatMap (`allCombinationsWithOne` s) f
+
+-- allCombinationsWithMany :: [a] -> [[a]] -> [[a]]
+-- allCombinationsWithMany f [] = [f]
+-- allCombinationsWithMany f s = concatMap (allCombinations f) s
+
+allCombinations :: [a] -> [[a]] -> [[a]]
+allCombinations ls [] = map (:[]) ls
+allCombinations [] dl = []
+allCombinations (h:rest) dl = map (h:) dl ++ allCombinations rest dl
+
+buildAll :: [[Int]] -> [[Char]]
+buildAll = foldr (allCombinations . map intToDigit) []
+
+possibilities = buildAll . map (\ (small,big) -> [small..big]) $ [(1,5), (3,9), (6,9), (2,9), (1,9), (1,9), (1,2), (1,6), (1,9), (1,9), (1,7), (1,9), (1,9), (1,9)]
+
+firstPart :: [Char]
+firstPart = maximum $ mapMaybe (\ bs ->  removeImpossible bs >>= tagWithRange >>= biggestFulfilling) allPaths
 
 data Expr a = Var Char
             | Val a
@@ -140,6 +249,44 @@ smallestWithKnownOutput target (Mul x y) = [(target,Mul x y)]
 smallestWithKnownOutput target (Div x y) = [(target,Div x y)]
 smallestWithKnownOutput target (Mod x y) = [(target,Mod x y)]
 smallestWithKnownOutput target (Eql x y) = [(target,Eql x y)]
+
+constants :: [(Int,(Int,Int,Int))]
+constants = [(1,(1,13,8))
+            ,(2,(1,12,13))
+            ,(3,(1,12,8))
+            ,(4,(1,10,10))
+            ,(5,(26,-11,12))
+            ,(6,(26,-13,1))
+            ,(7,(1,15,13))
+            ,(8,(1,10,5))
+            ,(9,(26,-2,10))
+            ,(10,(26,-6,3))
+            ,(11,(1,14,2))
+            ,(12,(26,0,2))
+            ,(13,(26,-15,12))
+            ,(14,(26,-4,7))]
+
+giveFinalZ :: [String] -> String -> Variable
+giveFinalZ instr inp = (\ (_,_,_,z) -> z) . executeInstructionsV instr inp $ initialALUVar
+
+giveNthY :: Int -> Variable -> Variable
+giveNthY 1 = last . snd . deconstruct
+giveNthY n = giveNthY (n-1) . head . snd . deconstruct
+
+couldHaveComeEqual :: Int -> Int -> [Int]
+couldHaveComeEqual z round =
+  let (d,t1,_) = fromMaybe undefined (lookup round constants)
+  in if d == 1 then [z] else map ((d * z +) . (\ n -> n - t1)) [1..9]
+
+couldHaveComeNotEqual :: Int -> Int -> [Int]
+couldHaveComeNotEqual z round =
+  let (d,t1,t2) = fromMaybe undefined (lookup round constants)
+      wT2 = filter (\ n -> n >= 0 && n `mod` 26 == 0) $ map (\ n -> z - t2 - n) [1..9]
+      mRemovedWT2 = if null wT2 then Nothing else Just $ head wT2
+  in maybe [] (\ val -> map ((val `div` 26) * d +) [0..25]) mRemovedWT2
+
+couldHaveComeFrom :: Int -> Int -> ([Int],[Int])
+couldHaveComeFrom z round = (couldHaveComeEqual z round, couldHaveComeNotEqual z round)
 
 bruteForce :: [Char] -> Int -> Variable -> [(Char,[Int])]
 bruteForce = undefined
@@ -428,9 +575,9 @@ firstMatch instructions input =
     then read input
     else firstMatch instructions (giveSmaller input)
 
-firstPart :: IO Int
-firstPart = do instructions <- input
-               return $ firstMatch instructions (replicate 14 '9')
+-- firstPart :: IO Int
+-- firstPart = do instructions <- input
+--                return $ firstMatch instructions (replicate 14 '9')
 
 test :: IO Bool
 test = (`validateModelNumber` testInput) <$> input
