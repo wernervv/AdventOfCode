@@ -38,12 +38,14 @@ public class Day_24 {
     }
 
     private static int[] connections(boolean[] bs) {
-        int[] conns = new int[14];
+        int[] conns = new int[bs.length];
         Stack<Integer> rs = new Stack<>();
-        rs.push(-1);
+        Integer minusOne = -1;
+        rs.push(minusOne);
+
         for (int i=0; i<bs.length; i++) {
             if (rs.empty()) {
-                rs.push(-1);
+                rs.push(minusOne);
             }
             conns[i] = rs.peek();
             if (constants[i][0] == 26) {
@@ -59,14 +61,14 @@ public class Day_24 {
     private static ArrayList<Integer> restrictPrev(ArrayList<Integer> il, int offset) {
         if (offset >= 0) {
             int newMax = 9 - offset;
-            for (int i=newMax+1; i<=9; i++) {
-                il.remove(new Integer(i));
+            for (Integer i=newMax+1; i<=9; i++) {
+                il.remove(i);
             }
         }
         else {
             int newMin = 1 - offset;
-            for (int i=1; i<newMin; i++) {
-                il.remove(new Integer(i));
+            for (Integer i=1; i<newMin; i++) {
+                il.remove(i);
             }
         }
         return il;
@@ -75,14 +77,14 @@ public class Day_24 {
     private static ArrayList<Integer> restrictCurrent(ArrayList<Integer> il, int offset) {
         if (offset >= 0) {
             int newMin = 1 + offset;
-            for (int i=1; i<newMin; i++) {
-                il.remove(new Integer(i));
+            for (Integer i=1; i<newMin; i++) {
+                il.remove(i);
             }
         }
         else {
             int newMax = 9 + offset;
-            for (int i=newMax+1; i<=9; i++) {
-                il.remove(new Integer(i));
+            for (Integer i=newMax+1; i<=9; i++) {
+                il.remove(i);
             }
         }
         return il;
@@ -92,7 +94,7 @@ public class Day_24 {
         ArrayList<ArrayList<Integer>> ranges = new ArrayList<>();
         for (int i=0; i<bs.length; i++) {
             ArrayList<Integer> il = new ArrayList<>();
-            for (int j=9; j>0; j--) {
+            for (Integer j=9; j>0; j--) {
                 il.add(j);
             }
             ranges.add(il);
@@ -107,8 +109,19 @@ public class Day_24 {
                     int t2 = constants[prev][2];
                     offset = t2 + t1;
                     ranges.set(prev, restrictPrev(ranges.get(prev), offset));
+                    ranges.set(i, restrictCurrent(ranges.get(i), offset));
                 }
-                ranges.set(i, restrictCurrent(ranges.get(i), offset));
+                else {
+                    Integer onlyPossible = offset;
+                    ArrayList<Integer> il = new ArrayList<>();
+                    for (Integer in : ranges.get(i)) {
+                        if (in.equals(onlyPossible)) {
+                            il.add(in);
+                            break;
+                        }
+                    }
+                    ranges.set(i, il);
+                }
             }
         }
 
@@ -120,7 +133,7 @@ public class Day_24 {
                         int t2 = constants[prev][2];
                         int t1 = constants[i][1];
                         int offset = t2 + t1;
-                        int problematic = ranges.get(i).get(0) - offset;
+                        Integer problematic = ranges.get(i).get(0) - offset;
                         ranges.get(prev).remove(problematic);
                     }
                 }
@@ -133,13 +146,14 @@ public class Day_24 {
         for (int i=ind+1; i<ranges.size(); i++) {
             if (conns[i] == ind) {
                 int offset = constants[ind][2] + constants[i][1];
+                Integer onlyPossible = picked + offset;
                 if (bs[i]) {
                     ArrayList<Integer> il = new ArrayList<>();
-                    il.add(picked + offset);
+                    il.add(onlyPossible);
                     ranges.set(i, il);
                 }
                 else {
-                    ranges.get(i).remove(new Integer(picked + offset));
+                    ranges.get(i).remove(onlyPossible);
                 }
             }
         }
@@ -160,31 +174,11 @@ public class Day_24 {
     }
 
     public static Optional<String> biggestFulfilling(boolean[] bs) {
-        // for every b in bs: if b -> r + t2 = w -> branch is not entered
+        // for every b in bs: if b -> r + t2 == w -> branch is not entered
         int[] conns = connections(bs);
         ArrayList<ArrayList<Integer>> ranges = ranges(conns, bs);
-        // System.out.println("BOOLEANS");
-        // for (boolean b : bs) {
-        //     System.out.format(" %b", b);
-        // }
-        // System.out.println();
-
-        // System.out.println("RANGES");
-        // for (ArrayList<Integer> li : ranges) {
-        //     for (Integer i : li) {
-        //         System.out.format(" %d", i);
-        //     }
-        //     System.out.println();
-        // }
 
         Optional<String> sol = createBiggest(conns, ranges, bs);
-        // System.out.println("SOLUTION");
-        // if (sol.isPresent()) {
-        //     System.out.println(sol.get());
-        // }
-        // else {
-        //     System.out.println("NO SOLUTION");
-        // }
         return sol;
     }
 
@@ -198,12 +192,15 @@ public class Day_24 {
     }
 
     private static void changeToTrue(int ind, boolean[] bs) {
-        if (bs[ind] == true) {
+        if (bs[ind]) {
             if (ind != 0) {
                 changeToTrue(ind-1, bs);
             }
+            bs[ind] = false;
         }
-        bs[ind] = true;
+        else {
+            bs[ind] = true;
+        }
     }
 
     private static void nextBools(boolean[] bs) {
@@ -222,12 +219,17 @@ public class Day_24 {
                 Optional<String> opStr = biggestFulfilling(bs);
                 if (opStr.isPresent()) {
                     String sol = opStr.get();
-                    System.out.println(sol);
                     solutions.add(sol);
                 }
             }
             nextBools(bs);
         }
-        // System.out.println(solutions.get(0));
+        String biggest = solutions.get(0);
+        for (String s : solutions) {
+            if (s.compareTo(biggest) > 0) {
+                biggest = s;
+            }
+        }
+        System.out.println(biggest);
     }
 }
