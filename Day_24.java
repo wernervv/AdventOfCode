@@ -94,7 +94,10 @@ public class Day_24 {
         ArrayList<ArrayList<Integer>> ranges = new ArrayList<>();
         for (int i=0; i<bs.length; i++) {
             ArrayList<Integer> il = new ArrayList<>();
-            for (Integer j=9; j>0; j--) {
+            // for (Integer j=9; j>0; j--) {
+            //     il.add(j);
+            // }
+            for (Integer j=1; j<=9; j++) {
                 il.add(j);
             }
             ranges.add(il);
@@ -159,7 +162,21 @@ public class Day_24 {
         }
     }
 
-    private static Optional<String> createBiggest(int[] conns, ArrayList<ArrayList<Integer>> ranges, boolean[] bs) {
+    // private static Optional<String> createBiggest(int[] conns, ArrayList<ArrayList<Integer>> ranges, boolean[] bs) {
+    //     StringBuilder sb = new StringBuilder();
+    //     for (int i=0; i<bs.length; i++) {
+    //         if (ranges.get(i).isEmpty()) {
+    //             return Optional.empty();
+    //         }
+    //         int picked = ranges.get(i).get(0);
+    //         modifyOthers(i, picked, conns, ranges, bs);
+    //         char pickedC = (char)(picked+'0');
+    //         sb.append(pickedC);
+    //     }
+    //     return Optional.of(sb.toString());
+    // }
+
+    private static Optional<String> createSmallest(int[] conns, ArrayList<ArrayList<Integer>> ranges, boolean[] bs) {
         StringBuilder sb = new StringBuilder();
         for (int i=0; i<bs.length; i++) {
             if (ranges.get(i).isEmpty()) {
@@ -173,12 +190,20 @@ public class Day_24 {
         return Optional.of(sb.toString());
     }
 
-    public static Optional<String> biggestFulfilling(boolean[] bs) {
-        // for every b in bs: if b -> r + t2 == w -> branch is not entered
+    // public static Optional<String> biggestFulfilling(boolean[] bs) {
+    //     // for every b in bs: if b -> r + t2 == w -> branch is not entered
+    //     int[] conns = connections(bs);
+    //     ArrayList<ArrayList<Integer>> ranges = ranges(conns, bs);
+
+    //     Optional<String> sol = createBiggest(conns, ranges, bs);
+    //     return sol;
+    // }
+
+    public static Optional<String> smallestFulfilling(boolean[] bs) {
         int[] conns = connections(bs);
         ArrayList<ArrayList<Integer>> ranges = ranges(conns, bs);
 
-        Optional<String> sol = createBiggest(conns, ranges, bs);
+        Optional<String> sol = createSmallest(conns, ranges, bs);
         return sol;
     }
 
@@ -216,7 +241,8 @@ public class Day_24 {
         ArrayList<String> solutions = new ArrayList<>();
         while (!allTrue(bs)) {
             if (isValid(bs)) {
-                Optional<String> opStr = biggestFulfilling(bs);
+                // Optional<String> opStr = biggestFulfilling(bs);
+                Optional<String> opStr = smallestFulfilling(bs);
                 if (opStr.isPresent()) {
                     String sol = opStr.get();
                     solutions.add(sol);
@@ -224,12 +250,17 @@ public class Day_24 {
             }
             nextBools(bs);
         }
-        String biggest = solutions.get(0);
+        // String biggest = solutions.get(0);
+        String smallest = solutions.get(0);
         for (String s : solutions) {
-            if (s.compareTo(biggest) > 0) {
-                biggest = s;
+            // if (s.compareTo(biggest) > 0) {
+            //     biggest = s;
+            // }
+            if (s.compareTo(smallest) < 0) {
+                smallest = s;
             }
         }
-        System.out.println(biggest);
+        // System.out.println(biggest);
+        System.out.println(smallest);
     }
 }
