@@ -31,7 +31,7 @@ applyOneRound (xEqualsW,(d,t1,t2),mRange) w (n,r) =
       newZ = if r + t1 == w
                then 26 * tmpZ + w + t2
                else tmpZ
-  in (tmpZ `div` 26, tmpZ `mod` 26)
+  in (newZ `div` 26, newZ `mod` 26)
 
 allPaths :: [[Bool]]
 allPaths = [ [a,b,c,d,e,f,g,h,i,j,k,l,m,n] | a <- [True,False], b <- [True,False], c <- [True,False], d <- [True,False], e <- [True,False], f <- [True,False], g <- [True,False], h <- [True,False], i <- [True,False], j <- [True,False], k <- [True,False], l <- [True,False], m <- [True,False], n <- [True,False]]
@@ -82,16 +82,16 @@ biggestFulfilling = helper (0,0) []
   where
     helper _ acc [] = Just . reverse $ acc
     helper z@(n,r) acc (vars@(xEqualsW,(d,t1,t2),mRange):rest) =
-      let usableRange = reverse . filter (\ w -> if xEqualsW then w == r + t2 else w /= r + t2) . (\ p -> [(fst p)..(snd p)]) $ fromMaybe (1,9) mRange
+      let usableRange = reverse . filter (\ w -> if xEqualsW then w == r + t1 else w /= r + t1) . (\ p -> [(fst p)..(snd p)]) $ fromMaybe (1,9) mRange
       in if null usableRange
            then Nothing
            else case helper (applyOneRound vars (head usableRange) z) ((intToDigit . head $ usableRange) : acc) rest of
                   Nothing -> if null (tail usableRange) then Nothing else helper z acc ((xEqualsW,(d,t1,t2), Just (head $ tail usableRange,last $ tail usableRange)):rest)
                   Just cs -> Just cs
 
-allCombinationsWithOne :: a -> [a] -> [[a]]
-allCombinationsWithOne a [] = [[a]]
-allCombinationsWithOne a bs = map ((a:) . (:[])) bs
+-- allCombinationsWithOne :: a -> [a] -> [[a]]
+-- allCombinationsWithOne a [] = [[a]]
+-- allCombinationsWithOne a bs = map ((a:) . (:[])) bs
 
 -- allCombinations :: [a] -> [a] -> [[a]]
 -- allCombinations f s = concatMap (`allCombinationsWithOne` s) f
@@ -110,8 +110,109 @@ buildAll = foldr (allCombinations . map intToDigit) []
 
 possibilities = buildAll . map (\ (small,big) -> [small..big]) $ [(1,5), (3,9), (6,9), (2,9), (1,9), (1,9), (1,2), (1,6), (1,9), (1,9), (1,7), (1,9), (1,9), (1,9)]
 
+-- firstPart :: [Char]
+-- firstPart = maximum $ mapMaybe (\ bs ->  removeImpossible bs >>= tagWithRange >>= biggestFulfilling) allPaths
+
 firstPart :: [Char]
-firstPart = maximum $ mapMaybe (\ bs ->  removeImpossible bs >>= tagWithRange >>= biggestFulfilling) allPaths
+firstPart = maximum $ mapMaybe (\ bs -> giveBiggestOne bs (map snd constants)) allPaths
+
+theoreticallyPossible :: [(Int,Int,Int)] -> [Bool] -> Bool
+theoreticallyPossible constants bs = (== 0) . foldl (\ acc (b,(d,_,_)) -> if d == 1 then if not b then acc+1 else acc + 0 else if b then max (acc-1) 0 else acc + 0) 0 $ zip bs constants
+
+getConnections :: [(Int,Int,Int)] -> [Bool] -> [Int]
+getConnections constants bs = (\ (_,(_,val)) -> reverse val) $ foldl helper (1,([0],[])) (zip bs constants)
+  where
+    helper (n,([],acc)) zipped = helper (n,([0],acc)) zipped
+    helper (n,(r:rs,acc)) (b,(d,_,_))
+      | d == 1 = if b then (n+1,(n:r:rs,r:acc)) else (n+1,(r:rs,r:acc))
+      | b = (n+1,(n:rs,r:acc))
+      | otherwise = (n+1,(rs,r:acc))
+
+reduceFormer :: Int -> Int -> Int -> [[Int]] -> [[Int]]
+reduceFormer rFrom t2 t1 = helper (rFrom-1) (t2+t1)
+  where
+    helper _ _ [] = []
+    helper 0 c (range:rs) = filter (\ n -> n >= 1-c && n <= 9-c) range : rs
+    helper n c (range:rs) = range : helper (n-1) c rs
+
+reduceLatter :: Int -> Int -> Int -> [[Int]] -> [[Int]]
+reduceLatter n t2 t1 = helper (n-1) (t2+t1)
+  where
+    helper _ _ [] = []
+    helper 0 c (range:rs) = filter (\ n -> n >= 1+c && n <= 9+c) range : rs
+    helper n c (range:rs) = range : helper (n-1) c rs
+
+reduceBoth :: Int -> Int -> Int -> Int -> [[Int]] -> [[Int]]
+reduceBoth rFrom n t2 t1 ranges =
+  let latterReduced = reduceLatter n t2 t1 ranges
+  in if rFrom == 0 then latterReduced else reduceFormer rFrom t2 t1 latterReduced
+
+getRanges :: [(Int,Int,Int)] -> [Bool] -> [[Int]]
+getRanges constants bs = reverse $ helper 14 (reverse $ zip bs constants) (replicate 14 [1..9])
+  where
+    helper _ [] ranges = ranges
+    helper n ((b,(_,t1,_)):ls) ranges =
+      if not b
+        then helper (n-1) ls ranges
+        else let connections = getConnections constants bs
+                 rFrom = connections !! (n-1)
+                 t2 = if rFrom == 0 then 0 else (\ (_,_,n) -> n) $ constants !! (rFrom-1)
+             in helper (n-1) ls (reduceBoth rFrom n t2 t1 ranges)
+
+giveObservers :: Int -> [Int] -> [Int]
+giveObservers = helper 1
+  where
+    helper _ _ [] = []
+    helper n target (connection:cs) =
+      if connection == target then n : helper (n+1) target cs else helper (n+1) target cs
+
+modifyGivenRange :: Int -> [Int] -> [[Int]] -> [[Int]]
+modifyGivenRange round = helper (round-1)
+  where
+    helper 0 newRange ranges = newRange : tail ranges
+    helper n newRange ranges = head ranges : helper (n-1) newRange (tail ranges)
+
+afterPicking :: Int -> Int -> [Int] -> [[Int]] -> [(Int,Int,Int)] -> [Bool] -> [(Int,[Int])]
+afterPicking round picked seenBy ranges constants bs =
+  let (_,_,t2) = constants !! (round-1)
+      res = map (\ n -> (n,newRange n)) seenBy
+      newRange n =
+        let currentRange = ranges !! (n-1)
+            (_,t1,_) = constants !! (n-1)
+            newW = picked + t2 + t1
+        in if bs !! (n-1)
+          then [newW | newW >= 1 && newW <= 9]
+          else filter (/= newW) currentRange
+  in res
+
+modifyRanges :: (Int,Int) -> [Int] -> [(Int,Int,Int)] -> [Bool] -> [[Int]] -> [[Int]]
+modifyRanges (round,picked) seenBy constants bs ranges = foldl (\ rs (round,modified) -> modifyGivenRange round modified rs) ranges (afterPicking round picked seenBy ranges constants bs)
+
+smallerRange :: Int -> [[Int]] -> [[Int]]
+smallerRange round ranges =
+  let smaller = tail $ ranges !! (round-1)
+  in modifyGivenRange round smaller ranges
+
+pickRecursive :: Int -> [(Int,Int,Int)] -> [Int] -> [[Int]] -> [Bool] -> Maybe [Char]
+pickRecursive 15 _ _ _ _ = Just []
+pickRecursive round constants connections ranges bs =
+  if any null ranges then Nothing else
+  let currentConstants = constants !! (round-1)
+      seenBy = giveObservers round connections
+      currentRange = ranges !! (round-1)
+      picked = head currentRange
+      modifiedRanges = modifyRanges (round,picked) seenBy constants bs ranges
+  in case pickRecursive (round+1) constants connections modifiedRanges bs of
+        Nothing -> pickRecursive round constants connections (smallerRange round ranges) bs
+        Just cs -> Just $ intToDigit picked : cs
+
+giveBiggestOne :: [Bool] -> [(Int,Int,Int)] -> Maybe [Char]
+giveBiggestOne bs constants =
+  if not $ theoreticallyPossible constants bs
+    then Nothing
+    else let connections = getConnections constants bs
+             ranges = getRanges constants bs
+         in pickRecursive 1 constants connections ranges bs
 
 data Expr a = Var Char
             | Val a
