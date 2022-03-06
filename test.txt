@@ -20,10 +20,10 @@ add z y   add z y   add z y   add z y   add z y    add z y    add z y   add z y 
 int func(int z, int w, int d, int t1, int t2) {
   int x = z mod 26 + t1;       // {13,12,12,10,-11,-13,15,10,-2,-6,14, 0,-15,-4}
 
-  z = z div d;   // { 1, 1, 1, 1, 26, 26, 1, 1,26,26, 1,26, 26,26}
+  int tmpZ = z div d;   // { 1, 1, 1, 1, 26, 26, 1, 1,26,26, 1,26, 26,26}
 
   if (x != w) {
-    z = z * 26 + w + t2;  // { 8,13, 8,10, 12,  1,13, 5,10, 3, 2, 2, 12, 7}
+    z = 26 * tmpZ + w + t2; // { 8,13, 8,10, 12,  1,13, 5,10, 3, 2, 2, 12, 7}
   }
   return z;
 }
@@ -34,3 +34,27 @@ int func(int z, int w, int d, int t1, int t2) {
 
  14. z = [5,13]
  13. if (x == w) {z = [130,338] + [16,24]} else {w = 1, z = [0,25] \ {16}}
+
+round {5,6,9,10,12,13,14}
+z = n * 26 + r
+x /= w
+deltaZ = w + t2 - r
+
+maximum reduction:
+-12 -23 -14 -21 -22 -12 -17 = -121
+
+1  /= r = (w + t2) mod 26
+1  == r = lastR
+26 /= r = (w + t2) mod 26
+26 == r = n mod 26
+
+1  /= n = z + ((w + t2) div 26)
+1  == n = lastN
+26 /= lastN + ((w + t2) div 26)
+26 == n div 26
+
+1 -> either add one layer + calculate new r
+     or     pass value through unchanged
+26 -> either modify r
+      or     use previous n
+         if this is wanted imposes condition on the previous r

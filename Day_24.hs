@@ -39,7 +39,7 @@ allPaths = [ [a,b,c,d,e,f,g,h,i,j,k,l,m,n] | a <- [True,False], b <- [True,False
 removeImpossible :: [Bool] -> Maybe [(Bool,(Int,Int,Int))]
 removeImpossible bs =
   let bvars = zip bs (map (\ n -> fromMaybe undefined (lookup n constants)) [1..14])
-      layerCounts = scanl (\ count (b,(d,_,_)) -> if not b && d == 1 then count+1 else if b && d == 26 then max 0 (count-1) else count) 0 bvars
+      layerCounts = scanl (\ count (b,(d,_,_)) -> if not b && (d == 1) then count+1 else if b && (d == 26) then max 0 (count-1) else count) 0 bvars
   in if last layerCounts == 0
        then Just bvars
        else Nothing
@@ -110,8 +110,21 @@ buildAll = foldr (allCombinations . map intToDigit) []
 
 possibilities = buildAll . map (\ (small,big) -> [small..big]) $ [(1,5), (3,9), (6,9), (2,9), (1,9), (1,9), (1,2), (1,6), (1,9), (1,9), (1,7), (1,9), (1,9), (1,9)]
 
+<<<<<<< HEAD
 -- firstPart :: [Char]
 -- firstPart = maximum $ mapMaybe (\ bs ->  removeImpossible bs >>= tagWithRange >>= biggestFulfilling) allPaths
+=======
+coreFunction :: Int -> Char -> Int -> Int
+coreFunction round c z = newZ
+  where (d,t1,t2) = fromMaybe undefined (lookup round constants)
+        w = digitToInt c
+        newZ
+          | (z `mod` 26) + t1 == w = if d == 1 then z else z `div` 26
+          | otherwise = z `div` 26 + w + t2
+
+checkNumber :: [Char] -> Bool
+checkNumber cs = (== 0) $ foldl (flip ($)) 0 (zipWith coreFunction [1..14] cs)
+>>>>>>> 2cf970ddf1f9060c0070292db59999564ddb2ee1
 
 firstPart :: [Char]
 firstPart = maximum $ mapMaybe (\ bs -> giveBiggestOne bs (map snd constants)) allPaths
