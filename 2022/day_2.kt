@@ -10,7 +10,7 @@ fun main() {
     val input = readInput()
     var totalScore = 0
     for (line in input) {
-        val roundScore = calculateScore(line.split(" "))
+        val roundScore = calculateScoreTwo(line.split(" "))
         totalScore += roundScore
     }
     println(totalScore)
@@ -69,4 +69,46 @@ fun calculateScore(shapes: List<String>): Int {
     val shapeS = shapeScore(shapes[1])
     val roundS = roundOutcome(shapes)
     return  shapeS + roundS
+}
+
+fun giveLosing(shape: Char): Char {
+    if (shape == 'A') {
+        return 'Z'
+    }
+    else if (shape == 'B') {
+        return 'X'
+    }
+    else {
+        return 'Y'
+    }
+}
+
+fun shapeScoreTwo(shapes: List<String>): Int {
+    val shape = shapes[0].first()
+    val outCome = shapes[1].first()
+
+    if (outCome == 'X') {
+        return shapeScore(giveLosing(shape).toString())
+    }
+    else if (outCome == 'Y') {
+        return shapeScore(giveEqual(shape).toString())
+    }
+    else {
+        return shapeScore(giveBeating(shape).toString())
+    }
+}
+
+fun roundOutcomeTwo(shape: String): Int {
+    val score = when (shape.first()) {
+        'Y' -> 3
+        'Z' -> 6
+        else -> 0
+    }
+    return score
+}
+
+fun calculateScoreTwo(shapes: List<String>): Int {
+    val shapeS = shapeScoreTwo(shapes)
+    val roundS = roundOutcomeTwo(shapes[1])
+    return shapeS + roundS
 }
