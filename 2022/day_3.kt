@@ -9,9 +9,12 @@ fun readInput(): List<String> {
 fun main() {
     val input = readInput()
     var total = 0
-    for (line in input) {
-        val currentPriority = getPriority(findCommon(splitInTwo(line)))
+    var index = 0
+    while (index <= input.size - 3) {
+        val group = listOf(input[index], input[index+1], input[index+2])
+        val currentPriority = getPriority(findCommonTwo(group))
         total += currentPriority
+        index += 3
     }
     println(total)
 }
@@ -42,4 +45,22 @@ fun getPriority(c: Char): Int {
     else {
         return c.code - 'a'.code + 1
     }
+}
+
+fun findCommonTwo(parts: List<String>): Char {
+    val first = parts[0]
+    val second = parts[1]
+    val third = parts[2]
+    for (c in first) {
+        for (candidate2 in second) {
+            if (c == candidate2) {
+                for (candidate3 in third) {
+                    if (c == candidate3) {
+                        return c
+                    }
+                }
+            }
+        }
+    }
+    return '1'
 }
