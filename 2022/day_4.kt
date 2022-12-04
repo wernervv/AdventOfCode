@@ -10,7 +10,7 @@ fun main() {
     val input = readInput()
     var total = 0
     for (line in input) {
-        if (fullOverlap(givePoints(line))) {
+        if (partialOverlap(givePoints(line))) {
             total += 1
         }
     }
@@ -39,4 +39,24 @@ fun fullOverlap(points: List<Int>): Boolean {
     }
 
     return false
+}
+
+fun partialOverlap(points: List<Int>): Boolean {
+    val fStart = points[0]
+    val fEnd = points[1]
+    val sStart = points[2]
+    val sEnd = points[3]
+    
+    if (fStart < sStart) {
+        if (fEnd >= sStart) {
+            return true
+        }
+        return false
+    }
+
+    if (fStart > sEnd) {
+        return false
+    }
+    
+    return true
 }
