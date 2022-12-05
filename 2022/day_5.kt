@@ -54,8 +54,13 @@ fun processInstruction(instruction: String, stacks: ArrayList<ArrayDeque<Char>>)
     val from = splitInstruction[3].toInt() - 1
     val to = splitInstruction[5].toInt() - 1
 
+    var movingChunk = ArrayList<Char>()
     repeat(amount) {
         val moving = stacks.get(from).pop()
+        movingChunk.add(moving)
+    }
+
+    for (moving in movingChunk.reversed()) {
         stacks.get(to).push(moving)
     }
 
