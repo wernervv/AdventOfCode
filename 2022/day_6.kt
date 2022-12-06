@@ -9,16 +9,16 @@ fun readInput(): List<String> {
 
 fun main() {
     val input = readInput().get(0)
-    val result = findStart(input)
+    val result = findStart(input, 14)
     println(result)
 }
 
-fun findStart(buffer: String): Int {
+fun findStart(buffer: String, markerSize: Int): Int {
     var window = ArrayDeque<Char>()
-    for (i in 0..3) {
+    for (i in 0..(markerSize - 1)) {
         window.addLast(buffer.get(i))
     }
-    var index = 4
+    var index = markerSize
 
     while (containsDuplicates(window)) {
         window.pop()
