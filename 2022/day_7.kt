@@ -3,6 +3,8 @@ import java.util.ArrayDeque
 
 val fileName = "day_7_input.txt"
 val limit = 100000
+val totalSpace = 70000000
+val neededSpace = 30000000
 
 fun readInput(): List<String> {
     return File(fileName).readLines()
@@ -30,8 +32,16 @@ class Command(val command: String, val arg: String) {
 fun main() {
     val input = readInput()
     val root = traverseFilesystem(input)
+    val usedSpace = countDirectorySize(root)
+    val unusedSpace = totalSpace - usedSpace
+    val toRemove = neededSpace - unusedSpace
+
     val allDirs = giveAllDirectories(root)
-    println(allDirs.sumOf { val count = countDirectorySize(it); if (count <= limit) count else 0 })
+    val result = allDirs.map { countDirectorySize(it) }
+                        .filter { it >= toRemove }
+                        .min()
+    
+    println(result)
 }
 
 fun parseOneCommand(input: List<String>): Pair<Command, List<String>> {
@@ -109,20 +119,28 @@ fun giveAllDirectories(root: Directory): List<Directory> {
     return directories + root
 }
 
+fun sizeInThisDirectory(root: Directory): Int {
+    var total = 0
+    for (file in root.files) {
+        total += file.size
+    }
+    return total
+}
+
 fun countDirectorySize(root: Directory): Int {
     var total: Int
     if (root.totalSize != -1) {
         total = root.totalSize
     }
     else {
-        total = root.files.sumOf { it.size }
-    }
-    for (dir in root.subdirectories) {
-        if (dir.totalSize != -1) {
-            total += dir.totalSize
-        }
-        else {
-            total += countDirectorySize(dir)
+        total = sizeInThisDirectory(root)
+        for (dir in root.subdirectories) {
+            if (dir.totalSize != -1) {
+                total += dir.totalSize
+            }
+            else {
+                total += countDirectorySize(dir)
+            }
         }
     }
     root.totalSize = total
