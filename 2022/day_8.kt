@@ -15,15 +15,16 @@ class Grid(input: List<String>) {
 fun main() {
     val input = readInput()
     val grid = Grid(input)
-    var visibleCount = 0
+    var bestScenicScore = 0
     for (y in 0..(grid.height-1)) {
         for (x in 0..(grid.width-1)) {
-            if (canBeSeen(x, y, grid)) {
-                visibleCount += 1
+            val currentScore = scenicScore(x, y, grid)
+            if (currentScore > bestScenicScore) {
+                bestScenicScore = currentScore
             }
         }
     }
-    println(visibleCount)
+    println(bestScenicScore)
 }
 
 fun canBeSeenLeft(x: Int, y: Int, g: Grid): Boolean {
@@ -84,4 +85,65 @@ fun canBeSeen(x: Int, y: Int, grid: Grid): Boolean {
         return true
     }
     return false
+}
+
+fun viewingDistanceLeft(x: Int, y: Int, g: Grid): Int {
+    val treeHeight = g.grid[y][x]
+    var seenTreesCount = 0
+    for (i in (x-1) downTo 0) {
+        seenTreesCount += 1
+        val candidateHeight = g.grid[y][i]
+        if (candidateHeight >= treeHeight) {
+            return seenTreesCount
+        }
+    }
+    return seenTreesCount
+}
+
+fun viewingDistanceUp(x: Int, y: Int, g: Grid): Int {
+    val treeHeight = g.grid[y][x]
+    var seenTreesCount = 0
+    for (i in (y-1) downTo 0) {
+        seenTreesCount += 1
+        val candidateHeight = g.grid[i][x]
+        if (candidateHeight >= treeHeight) {
+            return seenTreesCount
+        }
+    }
+    return seenTreesCount
+}
+
+fun viewingDistanceRight(x: Int, y: Int, g: Grid): Int {
+    val treeHeight = g.grid[y][x]
+    var seenTreesCount = 0
+    for (i in (x+1)..(g.width-1)) {
+        seenTreesCount += 1
+        val candidateHeight = g.grid[y][i]
+        if (candidateHeight >= treeHeight) {
+            return seenTreesCount
+        }
+    }
+    return seenTreesCount
+}
+
+fun viewingDistanceDown(x: Int, y: Int, g: Grid): Int {
+    val treeHeight = g.grid[y][x]
+    var seenTreesCount = 0
+    for (i in (y+1)..(g.height-1)) {
+        seenTreesCount += 1
+        val candidateHeight = g.grid[i][x]
+        if (candidateHeight >= treeHeight) {
+            return seenTreesCount
+        }
+    }
+    return seenTreesCount
+}
+
+fun scenicScore(x: Int, y:Int, grid: Grid): Int {
+    val vdl = viewingDistanceLeft(x, y, grid)
+    val vdu = viewingDistanceUp(x, y, grid)
+    val vdr = viewingDistanceRight(x, y, grid)
+    val vdd = viewingDistanceDown(x, y, grid)
+
+    return vdl * vdu * vdr * vdd
 }
