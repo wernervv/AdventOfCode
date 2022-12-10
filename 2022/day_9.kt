@@ -13,10 +13,10 @@ fun readInput(): List<String> {
 fun main() {
     val input = readInput()
 
-    var headPos: Position = Pair(0,0)
-    var tailPos: Position = Pair(0,0)
+    var rope: Array<Position> = Array(10) { Pair(0,0) }
+
     var tailVisited: HashSet<Position> = HashSet<Position>()
-    tailVisited.add(tailPos)
+    tailVisited.add(rope[9])
 
     fun parseOneInstruction(inputLine: String) {
         val (direction, amountS) = inputLine.split(" ")
@@ -24,30 +24,38 @@ fun main() {
 
         if (direction == "U") {
             repeat(amount) {
-                headPos = moveHeadUp(headPos)
-                tailPos = moveTail(headPos, tailPos)
-                tailVisited.add(tailPos)
+                rope[0] = moveHeadUp(rope[0])
+                for (i in 1..9) {
+                    rope[i] = moveTail(rope[i-1], rope[i])
+                }
+                tailVisited.add(rope[9])
             }
         }
         else if (direction == "R") {
             repeat(amount) {
-                headPos = moveHeadRight(headPos)
-                tailPos = moveTail(headPos, tailPos)
-                tailVisited.add(tailPos)
+                rope[0] = moveHeadRight(rope[0])
+                for (i in 1..9) {
+                    rope[i] = moveTail(rope[i-1], rope[i])
+                }
+                tailVisited.add(rope[9])
             }
         }
         else if (direction == "D") {
             repeat(amount) {
-                headPos = moveHeadDown(headPos)
-                tailPos = moveTail(headPos, tailPos)
-                tailVisited.add(tailPos)
+                rope[0] = moveHeadDown(rope[0])
+                for (i in 1..9) {
+                    rope[i] = moveTail(rope[i-1], rope[i])
+                }
+                tailVisited.add(rope[9])
             }
         }
         else if (direction == "L") {
             repeat(amount) {
-                headPos = moveHeadLeft(headPos)
-                tailPos = moveTail(headPos, tailPos)
-                tailVisited.add(tailPos)
+                rope[0] = moveHeadLeft(rope[0])
+                for (i in 1..9) {
+                    rope[i] = moveTail(rope[i-1], rope[i])
+                }
+                tailVisited.add(rope[9])
             }
         }
     }
@@ -95,6 +103,9 @@ fun moveTail(headPos: Position, tailPos: Position): Position {
         moveX = xDiff / 2 // Tail moves in hops of one
         if (yAbs == 1) { // Diagonal move needed
             moveY = yDiff
+        }
+        else if (yAbs == 2) { // Diagonal move also needed
+            moveY = yDiff / 2
         }
     }
     else if (xAbs == 1) {
