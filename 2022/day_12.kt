@@ -25,13 +25,11 @@ class Grid {
     var squares: Array<Array<Square>> = emptyArray()
 }
 
-fun initializeGrid(input: List<String>): Grid {
+fun initializeGrid(input: List<String>, startX: Int, startY: Int): Grid {
     val rows = input.size
     val cols = input[0].length
 
     val grid: Array<Array<Square>> = Array(rows) { emptyArray() }
-    var startX = 0
-    var startY = 0
     var endX = 0
     var endY = 0
 
@@ -42,11 +40,7 @@ fun initializeGrid(input: List<String>): Grid {
         for (col in 0..cols-1) {
             val elevation = input[row][col]
             if (elevation == 'S') {
-                startX = col
-                startY = row
-                val startSquare = Square('a', col, row)
-                startSquare.distanceSeen = 0
-                mapRow[col] = startSquare
+                mapRow[col] = Square('a', col, row)
             }
             else if (elevation == 'E') {
                 endX = col
@@ -55,6 +49,9 @@ fun initializeGrid(input: List<String>): Grid {
             }
             else {
                 mapRow[col] = Square(elevation, col, row)
+            }
+            if (row == startY && col == startX) {
+                mapRow[col].distanceSeen = 0
             }
         }
         grid[row] = mapRow
@@ -105,24 +102,52 @@ fun addSeen(seen: Square, allSeen: ArrayDeque<Square>): ArrayDeque<Square> {
     return allSeen
 }
 
-fun main() {
-    val input = readInput()
+fun giveLowestElevations(input: List<String>): List<Pair<Int,Int>> {
+    var positions: List<Pair<Int,Int>> = emptyList()
+    val maxY = input.size - 1
+    val maxX = input[0].length - 1
 
-    val grid = initializeGrid(input)
-
-    var seenSquares: ArrayDeque<Square> = ArrayDeque()
-    seenSquares.add(grid.squares[grid.startY][grid.startX])
-
-    while (seenSquares[0].distanceSeen < grid.squares[grid.endY][grid.endX].distanceSeen) {
-        val currentSquare = seenSquares.removeFirst()
-        val currentDistance = currentSquare.distanceSeen
-        for (neighbor in giveAccessibleNeighbors(currentSquare.x, currentSquare.y, grid)) {
-            if (currentDistance + 1 < neighbor.distanceSeen) {
-                grid.squares[neighbor.y][neighbor.x].distanceSeen = currentDistance + 1
-                seenSquares = addSeen(grid.squares[neighbor.y][neighbor.x], seenSquares)
+    for (y in 0..maxY) {
+        for (x in 0..maxX) {
+            val currentElevation = input[y][x]
+            if (currentElevation == 'a' || currentElevation == 'S') {
+                positions += Pair(x, y)
             }
         }
     }
+    return positions
+}
 
-    println(grid.squares[grid.endY][grid.endX].distanceSeen)
+fun main() {
+    val input = readInput()
+
+    var distances: List<Int> = emptyList()
+
+    fun distanceFromGivenStart(input: List<String>, x: Int, y: Int): Int {
+        val grid = initializeGrid(input, x, y)
+
+        var seenSquares: ArrayDeque<Square> = ArrayDeque()
+        seenSquares.add(grid.squares[grid.startY][grid.startX])
+
+        while (!seenSquares.isEmpty() && seenSquares[0].distanceSeen < grid.squares[grid.endY][grid.endX].distanceSeen) {
+            val currentSquare = seenSquares.removeFirst()
+            val currentDistance = currentSquare.distanceSeen
+            for (neighbor in giveAccessibleNeighbors(currentSquare.x, currentSquare.y, grid)) {
+                if (currentDistance + 1 < neighbor.distanceSeen) {
+                    grid.squares[neighbor.y][neighbor.x].distanceSeen = currentDistance + 1
+                    seenSquares = addSeen(grid.squares[neighbor.y][neighbor.x], seenSquares)
+                }
+            }
+        }
+
+        return grid.squares[grid.endY][grid.endX].distanceSeen
+    }
+
+    for ((startX, startY) in giveLowestElevations(input)) {
+        val distance = distanceFromGivenStart(input, startX, startY)
+        distances += distance
+    }
+
+    println(distances.min())
+
 }
