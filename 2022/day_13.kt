@@ -148,27 +148,32 @@ fun packetOrderIsCorrect(packetOne: String, packetTwo: String): Boolean {
 }
 
 fun main() {
-    val input = readInput()
-    var pairIndex = 1
+    val input = ArrayList(readInput())
+    input.removeIf({ it.isEmpty() })
 
-    var sumOfIndices = 0
+    val dividerOne = "[[2]]"
+    val dividerTwo = "[[6]]"
 
-    while (true) {
-        val firstIndex = (pairIndex - 1) * 3
-        val secondIndex = firstIndex + 1
-        if (secondIndex >= input.size) {
-            break
+    var firstIndex = 1
+
+    val biggerThanFirst: ArrayList<String> = ArrayList()
+
+    for (packet in input) {
+        if (packetOrderIsCorrect(packet, dividerOne)) {
+            firstIndex += 1
         }
-
-        val packetOne = input[firstIndex]
-        val packetTwo = input[secondIndex]
-
-        if (packetOrderIsCorrect(packetOne, packetTwo)) {
-            sumOfIndices += pairIndex
+        else {
+            biggerThanFirst.add(packet)
         }
-
-        pairIndex += 1
     }
 
-    println(sumOfIndices)
+    var secondIndex = firstIndex+1
+
+    for (packet in biggerThanFirst) {
+        if (packetOrderIsCorrect(packet, dividerTwo)) {
+            secondIndex += 1
+        }
+    }
+
+    println(firstIndex * secondIndex)
 }
