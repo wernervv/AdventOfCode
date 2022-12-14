@@ -110,8 +110,11 @@ fun giveLowestRock(rocks: HashMap<Int,ArrayList<Int>>): Int {
     return currentBottom
 }
 
-fun tileIsFree(position: Pair<Int,Int>, cave: HashMap<Int,ArrayList<Int>>): Boolean {
+fun tileIsFree(position: Pair<Int,Int>, cave: HashMap<Int,ArrayList<Int>>, infiniteFloorLevel: Int): Boolean {
     val (x,y) = position
+    if (y == infiniteFloorLevel) {
+        return false
+    }
     val relevantRow = cave.get(x)
     if (relevantRow == null) {
         return true
@@ -137,45 +140,45 @@ fun downRight(position: Pair<Int,Int>): Pair<Int,Int> {
 }
 
 fun pourOneUnitOfSand(cave: HashMap<Int,ArrayList<Int>>, pouringPosition: Pair<Int,Int>, bottom: Int): Boolean {
+    val infiniteFloorLevel = 2 + bottom
     var currentPosition = pouringPosition
-    var fallsToVoid = false
+    var blocksSource = false
 
     while (true) {
-        if (currentPosition.second == bottom) {
-            fallsToVoid = true
-            break
-        }
         val below = rightBelow(currentPosition)
         val left = downLeft(currentPosition)
         val right = downRight(currentPosition)
-        if (tileIsFree(below, cave)) {
+        if (tileIsFree(below, cave, infiniteFloorLevel)) {
             currentPosition = below
         }
-        else if (tileIsFree(left, cave)) {
+        else if (tileIsFree(left, cave, infiniteFloorLevel)) {
             currentPosition = left
         }
-        else if (tileIsFree(right, cave)) {
+        else if (tileIsFree(right, cave, infiniteFloorLevel)) {
             currentPosition = right
         }
         else {
-            val (x,y) = currentPosition
             addNewRockPositions(listOf(currentPosition), cave)
+            val (x,y) = currentPosition
+            if (x == pouringPosition.first && y == pouringPosition.second) {
+                blocksSource = true
+            }
             break
         }
     }
 
-    return fallsToVoid
+    return blocksSource
 }
 
 fun pourSand(cave: HashMap<Int,ArrayList<Int>>, pouringPosition: Pair<Int,Int>, bottom: Int): Int {
     var unitsPoured = 0
-    var latestFell = false
+    var blocksSource = false
 
-    while (!latestFell) {
-        latestFell = pourOneUnitOfSand(cave, pouringPosition, bottom)
+    while (!blocksSource) {
+        blocksSource = pourOneUnitOfSand(cave, pouringPosition, bottom)
         unitsPoured += 1
     }
-    return unitsPoured - 1
+    return unitsPoured
 }
 
 fun main() {
