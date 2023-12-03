@@ -46,3 +46,25 @@ testInput = ["Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green",
   "Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red",
   "Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green"]
 
+minimumsForSubset :: [Cube] -> (Int,Int,Int)
+minimumsForSubset = go (0,0,0)
+  where
+    go initial [] = initial
+    go initial (c:cs) = go (updateOneLimit initial c) cs
+    updateOneLimit (r,g,b) c = case c of
+      Red n -> (max r n, g, b)
+      Green n -> (r, max g n, b)
+      Blue n -> (r, g, max b n)
+
+updateLimits :: (Int,Int,Int) -> (Int,Int,Int) -> (Int,Int,Int)
+updateLimits (r1, g1, b1) (r2, g2, b2) = (max r1 r2, max g1 g2, max b1 b2)
+
+minimumsForGame :: String -> (Int,Int,Int)
+minimumsForGame = foldl1 updateLimits . map (minimumsForSubset . subsetToCubes) . giveSubsets 
+
+calculatePower :: (Int,Int,Int) -> Int
+calculatePower (r,g,b) = r * g * b
+
+secondPuzzle :: IO Int
+secondPuzzle = sum . map (calculatePower . minimumsForGame) <$> input
+
