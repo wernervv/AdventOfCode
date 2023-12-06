@@ -22,3 +22,18 @@ waysOfBeatingRecord (t,d) = length . filter (> d) . map (distanceWithHold t) $ [
 firstPuzzle :: IO Int
 firstPuzzle = product . map waysOfBeatingRecord . raceRecords <$> input
 
+parseOneTime :: [String] -> Int
+parseOneTime = read . concat . words . drop 1 . dropWhile (/= ':') . (!! 0)
+
+parseOneDistance :: [String] -> Int
+parseOneDistance = read . concat . words . drop 1 . dropWhile (/= ':') . (!! 1)
+
+oneRaceRecord :: [String] -> (Int,Int)
+oneRaceRecord inp =
+  let time = parseOneTime inp
+      distance = parseOneDistance inp
+  in (time, distance)
+
+secondPuzzle :: IO Int
+secondPuzzle = waysOfBeatingRecord . oneRaceRecord <$> input
+
