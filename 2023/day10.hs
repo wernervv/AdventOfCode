@@ -101,10 +101,92 @@ farthestFromStart g = loopLength `div` 2
 firstPuzzle :: IO Int
 firstPuzzle = farthestFromStart <$> input
 
+coordinatesFromStart :: Grid -> Coordinates -> Direction -> [Coordinates]
+coordinatesFromStart g startCoords dir = go [] g startCoords dir
+  where
+    go accum g currentCoords arrivingDir =
+      if (currentCoords == startCoords && length accum > 0)
+        then accum
+        else let (newCoords, newArrivingDir) = (\ (Just p) -> p) $ moveOneStep g (currentCoords, arrivingDir)
+             in go (currentCoords : accum) g newCoords newArrivingDir
+
+giveLoopCoordinates :: Grid -> [Coordinates]
+giveLoopCoordinates g = coordinatesFromStart g startCoords loopDir
+  where
+    startCoords = giveStart g
+    loopDir = head . filter (\ dir -> loopsInDirection g startCoords dir dir) $ [N,E,S,W]
+
+isPartOfLoop :: [Coordinates] -> Coordinates -> Bool
+isPartOfLoop = flip elem
+
+areOppositeChars :: Char -> Char -> Bool
+areOppositeChars 'F' 'J' = True
+areOppositeChars 'L' '7' = True
+areOppositeChars 'J' 'F' = True
+areOppositeChars '7' 'L' = True
+areOppositeChars _ _ = False
+
+countSection :: Grid -> [Coordinates] -> (Int, [Coordinates])
+countSection g (c:cs) =
+  let startChar = getTile g c
+      skippedUntilRelevant = dropWhile (\ c -> getTile g c == '-') cs
+      endChar = getTile g (head skippedUntilRelevant)
+      count = if (areOppositeChars startChar endChar)
+                then 1
+                else 0
+  in (count, tail skippedUntilRelevant)
+
+countDistinctFromCoordinates :: Grid -> [Coordinates] -> [Coordinates] -> Int -> Int
+countDistinctFromCoordinates _ _ [] n = n
+countDistinctFromCoordinates g loopCoords coords@(c:cs) n =
+  if (isPartOfLoop loopCoords c)
+    then if (getTile g c == '|')
+           then countDistinctFromCoordinates g loopCoords cs (n+1) 
+           else let (count, remainingCoords) = countSection g coords
+                in countDistinctFromCoordinates g loopCoords remainingCoords (n+count)
+    else countDistinctFromCoordinates g loopCoords cs n
+
+countDistinctLoopPartsToEdge :: Grid -> [Coordinates] -> Coordinates -> Int
+countDistinctLoopPartsToEdge g loopCoords (x,y) =
+  let maxX = length (g !! 0) - 1
+      (startX, startY) = giveStart g
+      startIsToTheRight = y == startY && startX > x
+      allUntilEdge =
+        if (startIsToTheRight)
+          then reverse $ map (\ x -> (x,y)) [0..(x-1)]
+          else map (\ x -> (x,y)) [(x+1)..maxX]
+  in countDistinctFromCoordinates g loopCoords allUntilEdge 0
+
+isInsideLoop :: Grid -> [Coordinates] -> Coordinates -> Bool
+isInsideLoop g loopCoords c = odd $ countDistinctLoopPartsToEdge g loopCoords c
+
+countAllInsideLoop :: Grid -> Int
+countAllInsideLoop g =
+  let maxX = length (g !! 0) - 1
+      maxY = length g - 1
+      allCoords = [(x,y) | y <- [0..maxY], x <- [0..maxX]]
+      loopCoords = giveLoopCoordinates g
+  in length . filter (\ c -> not (isPartOfLoop loopCoords c) && isInsideLoop g loopCoords c) $ allCoords
+
+secondPuzzle :: IO Int
+secondPuzzle = countAllInsideLoop <$> input
+
 testInput :: [String]
 testInput = ["-L|F7",
   "7S-7|",
   "L|7||",
   "-L-J|",
   "L|-JF"]
+
+biggerTest :: [String]
+biggerTest = ["FF7FSF7F7F7F7F7F---7",
+  "L|LJ||||||||||||F--J",
+  "FL-7LJLJ||||||LJL-77",
+  "F--JF--7||LJLJ7F7FJ-",
+  "L---JF-JLJ.||-FJLJJ7",
+  "|F|F-JF---7F7-L7L|7|",
+  "|FFJF7L7F-JF7|JL---7",
+  "7-L-JL7||F7|L7F-7F7|",
+  "L.L7LFJ|||||FJL7||LJ",
+  "L7JLJL-JLJLJL--JLJ.L"]
 
