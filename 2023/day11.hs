@@ -63,3 +63,24 @@ firstPuzzle =
          allGalaxyPairs = giveAllPairs galaxies
          emptySpaces = readEmptySpaces image
      return $ sum . (map (uncurry (distanceBetweenGalaxies emptySpaces))) $ allGalaxyPairs
+
+additionFromHugeExpanding :: EmptySpaces -> Galaxy -> Galaxy -> Int
+additionFromHugeExpanding (colIndices,rowIndices) (x1,y1) (x2,y2) =
+  let columnsBetween = if (x2 > x1) then giveAllBetween colIndices x1 x2 else giveAllBetween colIndices x2 x1
+      rowsBetween = if (y2 > y1) then giveAllBetween rowIndices y1 y2 else giveAllBetween rowIndices y2 y1
+  in (length columnsBetween * 999999) + (length rowsBetween * 999999)
+
+distanceBetweenOldGalaxies :: EmptySpaces -> Galaxy -> Galaxy -> Int
+distanceBetweenOldGalaxies es g1@(x1,y1) g2@(x2,y2) =
+  let xDiff = abs (x2 - x1)
+      yDiff = abs (y2 - y1)
+      effectOfExpansion = additionFromHugeExpanding es g1 g2
+  in xDiff + yDiff + effectOfExpansion
+
+secondPuzzle :: IO Int
+secondPuzzle =
+  do image <- input
+     let galaxies = readGalaxies image
+         allGalaxyPairs = giveAllPairs galaxies
+         emptySpaces = readEmptySpaces image
+     return $ sum . (map (uncurry (distanceBetweenOldGalaxies emptySpaces))) $ allGalaxyPairs
