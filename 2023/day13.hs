@@ -94,3 +94,81 @@ countSummary p =
 
 firstPuzzle :: IO Int
 firstPuzzle = sum . map countSummary . readPatterns <$> input
+
+countDifferencesBetweenTwoLines :: String -> String -> Int
+countDifferencesBetweenTwoLines a b = length . filter (uncurry (/=)) $ zip a b
+
+countDifferencesBetweenSets :: [String] -> [String] -> Int
+countDifferencesBetweenSets a b = sum . map (uncurry countDifferencesBetweenTwoLines) $ zip a b
+
+isPerfectReflectionWithSmudgeRows :: Pattern -> Int -> Bool
+isPerfectReflectionWithSmudgeRows p n =
+  let biggestY = length p - 1
+      firstRows = reverse $ take n p
+      lastRows = drop n p
+  in countDifferencesBetweenSets firstRows lastRows == 1
+
+findNewReflectionRow :: Pattern -> Int -> Maybe Int
+findNewReflectionRow p n =
+  let biggestY = length p - 1
+      rowsToCheck = filter (/= n) [1..biggestY]
+      pickFirstMatching _ [] = Nothing
+      pickFirstMatching p (n:ns) =
+        if (isPerfectReflectionWithSmudgeRows p n)
+          then Just n
+          else pickFirstMatching p ns
+  in pickFirstMatching p rowsToCheck 
+
+isPerfectReflectionWithSmudgeColumns :: Pattern -> Int -> Bool
+isPerfectReflectionWithSmudgeColumns p n =
+  let biggestY = length p - 1
+      biggestX = length (head p) - 1
+      allColumns = map (\ x -> map (\ y -> p !! y !! x) [0..biggestY]) [0..biggestX]
+      firstColumns = reverse $ take n allColumns
+      lastColumns = drop n allColumns
+  in countDifferencesBetweenSets firstColumns lastColumns == 1
+
+findNewReflectionColumn :: Pattern -> Int -> Maybe Int
+findNewReflectionColumn p n =
+  let biggestX = length (head p) - 1
+      columnsToCheck = filter (/= n) [1..biggestX]
+      pickFirstMatching _ [] = Nothing
+      pickFirstMatching p (n:ns) =
+        if (isPerfectReflectionWithSmudgeColumns p n)
+          then Just n
+          else pickFirstMatching p ns
+  in pickFirstMatching p columnsToCheck
+
+giveReflectionLineRows :: Pattern -> Maybe Int
+giveReflectionLineRows p =
+  case giveRowsAboveReflectionLine p of
+    (Just x) -> if (isPerfectReflectionRows p x)
+      then Just x
+      else Nothing
+    Nothing -> Nothing
+
+giveReflectionLineColumns :: Pattern -> Maybe Int
+giveReflectionLineColumns p =
+  case giveColumnsLeftOfReflectionLine p of
+    (Just x) -> if (isPerfectReflectionColumns p x)
+      then Just x
+      else Nothing
+    Nothing -> Nothing
+
+countSummaryWithSmudges :: Pattern -> Int
+countSummaryWithSmudges p =
+  case giveReflectionLineRows p of
+    (Just a) -> case findNewReflectionRow p a of
+      (Just b) -> 100 * b
+      Nothing -> case findNewReflectionColumn p (-1) of
+        (Just c) -> c
+        Nothing -> 0
+    Nothing -> case giveReflectionLineColumns p of
+      (Just d) -> case findNewReflectionColumn p d of
+        (Just e) -> e
+        Nothing -> case findNewReflectionRow p (-1) of
+          (Just f) -> 100 * f
+          Nothing -> 0
+
+secondPuzzle :: IO Int
+secondPuzzle = sum . map countSummaryWithSmudges . readPatterns <$> input
